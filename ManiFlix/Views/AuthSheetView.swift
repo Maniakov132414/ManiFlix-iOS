@@ -15,51 +15,102 @@ struct AuthSheetView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section {
-                    Picker("Chế độ", selection: $isRegisterMode) {
-                        Text("Đăng nhập").tag(false)
-                        Text("Đăng ký").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section {
-                    TextField("Tên đăng nhập", text: $username)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-
-                    if isRegisterMode {
-                        TextField("Tên hiển thị", text: $displayName)
-                    }
-
-                    SecureField("Mật khẩu", text: $password)
-                }
-
-                if let err = errorText {
-                    Section {
-                        Text(err)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                }
-
-                Section {
-                    Button {
-                        Task { await submit() }
-                    } label: {
+                if appState.isLoggedIn, let user = appState.currentUser {
+                    Section("Thông tin tài khoản") {
                         HStack {
+                            Text("Tên hiển thị")
                             Spacer()
-                            if isBusy {
-                                ProgressView()
-                            } else {
-                                Text(isRegisterMode ? "Tạo tài khoản" : "Đăng nhập")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(prefs.accentPreset.color)
-                            }
+                            Text(user.displayName ?? user.username)
+                                .foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("Tên đăng nhập")
                             Spacer()
+                            Text("@\(user.username)")
+                                .foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("Lịch sử xem")
+                            Spacer()
+                            Text("\(appState.history.count) phim")
+                                .foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("Phim đã lưu")
+                            Spacer()
+                            Text("\(appState.favorites.count) phim")
+                                .foregroundColor(.secondary)
                         }
                     }
-                    .disabled(isBusy || username.isEmpty || password.isEmpty)
+
+                    Section {
+                        Button {
+                            Task {
+                                isBusy = true
+                                await appState.refreshLibrary()
+                                isBusy = false
+                                Haptics.notify(.success)
+                            }
+                        } label: {
+                            HStack {
+                                Text("Đồng bộ dữ liệu ngay")
+                                Spacer()
+                                if isBusy { ProgressView().scaleEffect(0.8) }
+                            }
+                        }
+
+                        Button("Đăng xuất", role: .destructive) {
+                            appState.logout()
+                            dismiss()
+                        }
+                    }
+                } else {
+                    Section {
+                        Picker("Chế độ", selection: $isRegisterMode) {
+                            Text("Đăng nhập").tag(false)
+                            Text("Đăng ký").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Section {
+                        TextField("Tên đăng nhập", text: $username)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+
+                        if isRegisterMode {
+                            TextField("Tên hiển thị", text: $displayName)
+                        }
+
+                        SecureField("Mật khẩu", text: $password)
+                    }
+
+                    if let err = errorText {
+                        Section {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    Section {
+                        Button {
+                            Task { await submit() }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if isBusy {
+                                    ProgressView()
+                                } else {
+                                    Text(isRegisterMode ? "Tạo tài khoản" : "Đăng nhập")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(prefs.accentPreset.color)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .disabled(isBusy || username.isEmpty || password.isEmpty)
+                    }
                 }
             }
             .navigationTitle("Tài khoản")

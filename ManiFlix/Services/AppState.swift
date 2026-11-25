@@ -174,13 +174,16 @@ final class AppState: ObservableObject {
 
     func dismissPlayerKeepPiPIfNeeded() {
         isPlayerPresented = false
-        if let engine = activeEngine, !engine.isPiPActive {
-            engine.shutdown()
-            activeEngine = nil
+        if let engine = activeEngine {
+            if engine.closingExplicitly || !engine.isPiPActive {
+                engine.shutdown()
+                activeEngine = nil
+            }
         }
     }
 
     func stopPlaybackCompletely() {
+        activeEngine?.markClosingExplicitly()
         isPlayerPresented = false
         activeEngine?.shutdown()
         activeEngine = nil

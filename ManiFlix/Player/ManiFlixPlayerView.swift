@@ -113,6 +113,7 @@ struct ManiFlixPlayerView: View {
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var spatial = AudioSpatialEngine.shared
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showControls = true
     @State private var isLocked = false
@@ -130,102 +131,105 @@ struct ManiFlixPlayerView: View {
     @State private var scrubPreviewTime: Double = 0
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color.black.ignoresSafeArea()
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-                SharedPlayerLayerHost(engine: engine)
-                    .scaleEffect(x: engine.flipHorizontal ? -1 : 1, y: engine.flipVertical ? -1 : 1)
-                    .ignoresSafeArea()
+            // Video layer respects Safe Area (Dynamic Island) unless Tràn viền is selected
+            videoSurface
+                .scaleEffect(x: engine.flipHorizontal ? -1 : 1, y: engine.flipVertical ? -1 : 1)
+                .ignoresSafeArea(edges: engine.aspectMode == .edgeFill ? .all : [])
 
+            GeometryReader { geo in
                 gestureLayer(in: geo.size)
+            }
 
-                centerStatusOverlay
+            centerStatusOverlay
 
-                if let icon = gestureHUDIcon {
-                    HStack(spacing: 10) {
-                        Image(systemName: icon)
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                        ProgressView(value: gestureHUDValue)
-                            .tint(.white)
-                            .frame(width: 110)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .adaptiveGlassCapsule(interactive: false)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 24)
-                }
-
-                if isLongPressBoosting {
-                    HStack(spacing: 5) {
-                        Image(systemName: "forward.fill")
-                            .font(.caption2)
-                        Text("\(String(format: "%.2g", prefs.longPressSpeed))x")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .adaptiveGlassCapsule(interactive: false)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 24)
-                }
-
-                if let marker = engine.activeSkipPrompt, !isLocked {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            HStack(spacing: 10) {
-                                Button {
-                                    engine.skipActiveMarker()
-                                } label: {
-                                    Text(marker.label ?? "Bỏ qua mở đầu")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.white)
-                                }
-                                Button {
-                                    engine.dismissSkipPrompt()
-                                } label: {
-                                    Image(systemName: "xmark")
-                                        .font(.caption)
-                                        .foregroundColor(Color(white: 0.7))
-                                }
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .adaptiveGlassCapsule(interactive: true)
-                            .padding(.trailing, 20)
-                            .padding(.bottom, showControls ? 96 : 28)
-                        }
-                    }
-                }
-
-                if let toast = engine.statusToast {
-                    Text(toast)
-                        .font(.caption.weight(.medium))
+            if let icon = gestureHUDIcon {
+                HStack(spacing: 10) {
+                    Image(systemName: icon)
+                        .font(.subheadline)
                         .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .adaptiveGlassCapsule(interactive: false)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .padding(.top, 58)
+                    ProgressView(value: gestureHUDValue)
+                        .tint(.white)
+                        .frame(width: 110)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .adaptiveGlassCapsule(interactive: false)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 16)
+            }
 
-                if showControls {
-                    if isLocked {
-                        lockedControlsOverlay
-                    } else {
-                        fullControlsOverlay
+            if isLongPressBoosting {
+                HStack(spacing: 5) {
+                    Image(systemName: "forward.fill")
+                        .font(.caption2)
+                    Text("\(String(format: "%.2g", prefs.longPressSpeed))x")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .adaptiveGlassCapsule(interactive: false)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 16)
+            }
+
+            if let marker = engine.activeSkipPrompt, !isLocked {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 10) {
+                            Button {
+                                engine.skipActiveMarker()
+                            } label: {
+                                Text(marker.label ?? "Bỏ qua mở đầu")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                            }
+                            Button {
+                                engine.dismissSkipPrompt()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.caption)
+                                    .foregroundColor(Color(white: 0.7))
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .adaptiveGlassCapsule(interactive: true)
+                        .padding(.trailing, 20)
+                        .padding(.bottom, showControls ? 96 : 24)
                     }
                 }
             }
-            .contentShape(Rectangle())
+
+            if let toast = engine.statusToast {
+                Text(toast)
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .adaptiveGlassCapsule(interactive: false)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 52)
+            }
+
+            if showControls {
+                if isLocked {
+                    lockedControlsOverlay
+                        .zIndex(30)
+                } else {
+                    fullControlsOverlay
+                        .zIndex(30)
+                }
+            }
         }
         .statusBarHidden(true)
         .onAppear {
+            engine.closingExplicitly = false
             engine.syncAutoPiPPreference()
             OrientationController.allowFreeRotation()
             if prefs.autoRotateLandscape {
@@ -243,6 +247,25 @@ struct ManiFlixPlayerView: View {
         .sheet(isPresented: $showAudioDrawer) {
             audioSpatialDrawerSheet
         }
+    }
+
+    @ViewBuilder
+    private var videoSurface: some View {
+        if let ratio = engine.aspectMode.explicitRatio {
+            SharedPlayerLayerHost(engine: engine)
+                .aspectRatio(ratio, contentMode: .fit)
+                .clipped()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            SharedPlayerLayerHost(engine: engine)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func closePlayerTapped() {
+        engine.markClosingExplicitly()
+        appState.isPlayerPresented = false
+        dismiss()
     }
 
     private func gestureLayer(in size: CGSize) -> some View {
@@ -263,6 +286,10 @@ struct ManiFlixPlayerView: View {
                         .onChanged { value in
                             guard !isLocked else { return }
                             if abs(value.translation.height) > abs(value.translation.width) {
+                                if !isLandscape && value.startLocation.y < 120 && value.translation.height > 95 {
+                                    closePlayerTapped()
+                                    return
+                                }
                                 let start = dragStartValue ?? currentBrightness()
                                 if dragStartValue == nil { dragStartValue = start }
                                 let delta = Double(-value.translation.height / max(size.height * 0.55, 160))
@@ -294,6 +321,10 @@ struct ManiFlixPlayerView: View {
                         .onChanged { value in
                             guard !isLocked else { return }
                             if abs(value.translation.height) > abs(value.translation.width) {
+                                if !isLandscape && value.startLocation.y < 120 && value.translation.height > 95 {
+                                    closePlayerTapped()
+                                    return
+                                }
                                 let start = dragStartValue ?? Double(SystemVolumeController.shared.currentVolume)
                                 if dragStartValue == nil { dragStartValue = start }
                                 let delta = Double(-value.translation.height / max(size.height * 0.55, 160))
@@ -385,11 +416,12 @@ struct ManiFlixPlayerView: View {
                     Image(systemName: "lock.open")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .adaptiveGlassCapsule()
-                .padding(.trailing, 20)
-                .padding(.top, 18)
+                .padding(.trailing, 16)
+                .padding(.top, 12)
             }
             Spacer()
         }
@@ -399,13 +431,15 @@ struct ManiFlixPlayerView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Button {
-                    appState.stopPlaybackCompletely()
+                    closePlayerTapped()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.bold))
                         .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .adaptiveGlassCapsule()
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -472,7 +506,7 @@ struct ManiFlixPlayerView: View {
                 .adaptiveGlassCapsule()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.top, 10)
 
             Spacer()
 
@@ -585,12 +619,18 @@ struct ManiFlixPlayerView: View {
                     Spacer()
 
                     Button {
-                        cycleAspectGravity()
+                        engine.cycleAspectMode()
+                        scheduleAutoHide()
+                        Haptics.impact(.light)
                     } label: {
-                        Image(systemName: engine.videoGravity == .resizeAspectFill ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                            .frame(width: 34, height: 32)
+                        HStack(spacing: 4) {
+                            Image(systemName: "aspectratio")
+                            Text(engine.aspectMode.title)
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .frame(height: 32)
                     }
                     .adaptiveGlassCapsule()
 
@@ -613,7 +653,7 @@ struct ManiFlixPlayerView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 14)
+            .padding(.bottom, 12)
         }
         .background(
             LinearGradient(
@@ -700,7 +740,7 @@ struct ManiFlixPlayerView: View {
                     HStack {
                         Text("Cảm biến chuyển động đầu")
                         Spacer()
-                        Text(spatial.isHeadTrackingHardwareReady ? "Đang hoạt động" : "Không khả dụng")
+                        Text(spatial.isHeadTrackingHardwareReady ? "Đang hoạt động" : "Không hoạt động")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -739,6 +779,19 @@ struct ManiFlixPlayerView: View {
                     }
                 }
 
+                Section("Tỉ lệ & khung hình") {
+                    Picker("Tỉ lệ khung hình", selection: Binding(
+                        get: { engine.aspectMode },
+                        set: { engine.updateAspectMode($0) }
+                    )) {
+                        ForEach(PlayerAspectMode.allCases, id: \.self) { m in
+                            Text(m.title).tag(m)
+                        }
+                    }
+                    Toggle("Lật ngang khung hình", isOn: $engine.flipHorizontal)
+                    Toggle("Lật dọc khung hình", isOn: $engine.flipVertical)
+                }
+
                 Section("Tốc độ phát") {
                     HStack(spacing: 8) {
                         ForEach([Float(0.75), 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
@@ -756,10 +809,7 @@ struct ManiFlixPlayerView: View {
                     }
                 }
 
-                Section("Khung hình & mở ngoài") {
-                    Toggle("Lật ngang khung hình", isOn: $engine.flipHorizontal)
-                    Toggle("Lật dọc khung hình", isOn: $engine.flipVertical)
-
+                Section("Liên kết & mở ngoài") {
                     Button {
                         if let ep = engine.currentEpisode, let raw = ep.link_m3u8 {
                             UIPasteboard.general.string = engine.activeStreamURL.isEmpty ? raw : engine.activeStreamURL
@@ -823,20 +873,6 @@ struct ManiFlixPlayerView: View {
             if seekPulseText == text {
                 seekPulseText = nil
             }
-        }
-    }
-
-    private func cycleAspectGravity() {
-        switch engine.videoGravity {
-        case .resizeAspect:
-            engine.updateVideoGravity(.resizeAspectFill)
-            engine.showToast("Lấp đầy màn hình")
-        case .resizeAspectFill:
-            engine.updateVideoGravity(.resize)
-            engine.showToast("Kéo giãn khung hình")
-        default:
-            engine.updateVideoGravity(.resizeAspect)
-            engine.showToast("Tỉ lệ gốc")
         }
     }
 

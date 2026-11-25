@@ -54,7 +54,8 @@ struct MovieDetailView: View {
                     }
                 }
             }
-            .padding(.bottom, 32)
+            .padding(.bottom, 96)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
         .adaptiveSoftScrollEdge()
@@ -100,7 +101,7 @@ struct MovieDetailView: View {
                     }
 
                     if let year = detail?.year?.value ?? seedMovie?.year?.value, year > 0 {
-                        Text("\(year) • \(detail?.time ?? "HD")")
+                        Text("\(String(year)) • \(detail?.time ?? "HD")")
                             .font(.caption2)
                             .foregroundColor(Color(white: 0.55))
                     }

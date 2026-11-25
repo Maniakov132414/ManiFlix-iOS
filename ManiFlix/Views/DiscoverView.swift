@@ -34,7 +34,7 @@ struct MoviePosterCard: View {
                 .lineLimit(1)
 
             if let year = movie.year?.value, year > 0 {
-                Text("\(year) • \(movie.lang ?? "Vietsub")")
+                Text("\(String(year)) • \(movie.lang ?? "Vietsub")")
                     .font(.system(size: 11))
                     .foregroundColor(Color(white: 0.52))
                     .lineLimit(1)
@@ -54,6 +54,7 @@ struct DiscoverView: View {
     @State private var selectedGenreTag: String = "Tất cả"
     @State private var isLoading = true
     @State private var errorMsg: String?
+    @State private var showAccountSheet = false
 
     private let categories = ["Tất cả", "Phim bộ", "Phim lẻ", "Hoạt hình"]
 
@@ -135,7 +136,8 @@ struct DiscoverView: View {
                     latestGridSection
                 }
             }
-            .padding(.vertical, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 92)
         }
         .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
         .adaptiveSoftScrollEdge()
@@ -143,14 +145,20 @@ struct DiscoverView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    if !appState.isLoggedIn {
-                        appState.showAuthSheet = true
-                    }
+                    showAccountSheet = true
+                    Haptics.impact(.light)
                 } label: {
                     Image(systemName: appState.isLoggedIn ? "person.crop.circle.fill" : "person.crop.circle")
-                        .foregroundColor(appState.isLoggedIn ? prefs.accentPreset.color : Color(white: 0.85))
+                        .font(.system(size: 18))
+                        .foregroundColor(appState.isLoggedIn ? prefs.accentPreset.color : Color(white: 0.9))
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
+        }
+        .sheet(isPresented: $showAccountSheet) {
+            AuthSheetView()
         }
         .refreshable {
             await loadAll()
@@ -192,7 +200,7 @@ struct DiscoverView: View {
                             .foregroundColor(Color(white: 0.82))
                     }
                     if let year = movie.year?.value, year > 0 {
-                        Text("• \(year)")
+                        Text("• \(String(year))")
                             .font(.system(size: 10))
                             .foregroundColor(Color(white: 0.65))
                     }

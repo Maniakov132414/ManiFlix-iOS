@@ -5,6 +5,41 @@ import MediaPlayer
 import Combine
 import UIKit
 
+enum PlayerAspectMode: String, CaseIterable {
+    case fitSafe
+    case ratio16x9
+    case ratio4x3
+    case ratio21x9
+    case edgeFill
+
+    var title: String {
+        switch self {
+        case .fitSafe: return "Gốc"
+        case .ratio16x9: return "16:9"
+        case .ratio4x3: return "4:3"
+        case .ratio21x9: return "21:9"
+        case .edgeFill: return "Tràn viền"
+        }
+    }
+
+    var explicitRatio: CGFloat? {
+        switch self {
+        case .ratio16x9: return 16.0 / 9.0
+        case .ratio4x3: return 4.0 / 3.0
+        case .ratio21x9: return 21.0 / 9.0
+        case .fitSafe, .edgeFill: return nil
+        }
+    }
+
+    var layerGravity: AVLayerVideoGravity {
+        switch self {
+        case .fitSafe: return .resizeAspect
+        case .ratio16x9, .ratio4x3, .ratio21x9: return .resize
+        case .edgeFill: return .resizeAspectFill
+        }
+    }
+}
+
 @MainActor
 final class PlayerEngine: NSObject, ObservableObject {
     @Published var movie: MovieDetail
@@ -27,9 +62,11 @@ final class PlayerEngine: NSObject, ObservableObject {
     @Published var statusToast: String?
     @Published var isPiPActive: Bool = false
     @Published var isPiPPossible: Bool = false
+    @Published var aspectMode: PlayerAspectMode = .fitSafe
     @Published var videoGravity: AVLayerVideoGravity = .resizeAspect
     @Published var flipHorizontal: Bool = false
     @Published var flipVertical: Bool = false
+    var closingExplicitly: Bool = false
 
     let player = AVPlayer()
     let playerLayer = AVPlayerLayer()
@@ -104,9 +141,28 @@ final class PlayerEngine: NSObject, ObservableObject {
         }
     }
 
-    func updateVideoGravity(_ gravity: AVLayerVideoGravity) {
-        videoGravity = gravity
-        playerLayer.videoGravity = gravity
+    func updateAspectMode(_ mode: PlayerAspectMode) {
+        aspectMode = mode
+        videoGravity = mode.layerGravity
+        playerLayer.videoGravity = mode.layerGravity
+    }
+
+    func cycleAspectMode() {
+        let all = PlayerAspectMode.allCases
+        if let idx = all.firstIndex(of: aspectMode) {
+            let next = all[(idx + 1) % all.count]
+            updateAspectMode(next)
+            showToast("Tỉ lệ: \(next.title)")
+        }
+    }
+
+    func markClosingExplicitly() {
+        closingExplicitly = true
+        player.pause()
+        isPlaying = false
+        if pipController?.isPictureInPictureActive == true {
+            pipController?.stopPictureInPicture()
+        }
     }
 
     func togglePiP() {

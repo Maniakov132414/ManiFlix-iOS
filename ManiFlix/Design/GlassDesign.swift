@@ -202,9 +202,19 @@ struct CachedAsyncImage: View {
     var body: some View {
         Group {
             if let uiImage = loadedImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
+                if contentMode == .fill {
+                    Color.clear
+                        .overlay(
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                        )
+                        .clipped()
+                } else {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                }
             } else if failed {
                 ZStack {
                     Color(white: 0.1)
