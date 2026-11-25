@@ -52,7 +52,6 @@ struct MoviePosterCard: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.5)
                     )
-                    .shadow(color: Color.black.opacity(ManiFlixTheme.isLight(colorScheme) ? 0.12 : 0.28), radius: 8, x: 0, y: 4)
 
                 if let badge = movie.quality ?? movie.episode_current, !badge.isEmpty {
                     Text(badge)
@@ -320,7 +319,7 @@ struct DiscoverView: View {
         return ZStack(alignment: .bottomLeading) {
             NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                 ZStack(alignment: .bottomLeading) {
-                    CachedAsyncImage(url: movie.displayThumbURL ?? movie.displayPosterURL)
+                    CachedAsyncImage(url: movie.displayThumbURL ?? movie.displayPosterURL, maxPixelSize: 960)
                         .frame(maxWidth: .infinity)
                         .frame(height: heroCardHeight)
                         .clipped()
@@ -431,7 +430,6 @@ struct DiscoverView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.6)
         )
-        .shadow(color: Color.black.opacity(ManiFlixTheme.isLight(colorScheme) ? 0.18 : 0.4), radius: 14, x: 0, y: 8)
         .padding(.horizontal, 16)
         .movieCardContextMenu(movie)
     }
@@ -444,7 +442,7 @@ struct DiscoverView: View {
                 .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                LazyHStack(spacing: 12) {
                     ForEach(appState.history.prefix(10)) { item in
                         let cardItem = MovieItem(
                             _id: nil,
@@ -521,7 +519,7 @@ struct DiscoverView: View {
                     .padding(.horizontal, 16)
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 11) {
+                    LazyHStack(alignment: .top, spacing: 11) {
                         ForEach(items) { movie in
                             NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                                 MoviePosterCard(movie: movie)

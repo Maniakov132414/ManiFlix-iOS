@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 extension Color {
     init(hex: String) {
@@ -228,10 +229,10 @@ struct AmbientArtworkBackground: View {
             let light = ManiFlixTheme.isLight(colorScheme)
             let bg = ManiFlixTheme.background(scheme: colorScheme)
             ZStack(alignment: .top) {
-                CachedAsyncImage(url: artworkURL)
+                CachedAsyncImage(url: artworkURL, maxPixelSize: 64)
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
-                    .blur(radius: 62)
+                    .blur(radius: 22)
                     .saturation(light ? 1.12 : 1.28)
                     .opacity(light ? 0.24 : (prefs.themeMode == .oled || oled ? 0.34 : 0.44))
                     .overlay(
@@ -245,6 +246,7 @@ struct AmbientArtworkBackground: View {
                             endPoint: .bottom
                         )
                     )
+                    .drawingGroup(opaque: false)
                     .ignoresSafeArea(edges: .top)
             }
             .allowsHitTesting(false)
@@ -438,24 +440,44 @@ private struct ContainerWidthPreferenceKey: PreferenceKey {
 final class ImageCacheStore {
     static let shared = ImageCacheStore()
     private let cache = NSCache<NSString, UIImage>()
+    let urlSession: URLSession
 
     private init() {
-        cache.countLimit = 240
-        cache.totalCostLimit = 96 * 1024 * 1024
+        cache.countLimit = 220
+        cache.totalCostLimit = 45 * 1024 * 1024
+
+        let urlCache = URLCache(
+            memoryCapacity: 12 * 1024 * 1024,
+            diskCapacity: 64 * 1024 * 1024,
+            diskPath: "ManiFlixImageCache"
+        )
+        let config = URLSessionConfiguration.default
+        config.urlCache = urlCache
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.httpMaximumConnectionsPerHost = 6
+        self.urlSession = URLSession(configuration: config)
     }
 
-    func image(for url: URL) -> UIImage? {
-        cache.object(forKey: url.absoluteString as NSString)
+    private func cacheKey(for url: URL, maxPixelSize: CGFloat) -> NSString {
+        "\(url.absoluteString)#\(Int(maxPixelSize))" as NSString
     }
 
-    func store(_ image: UIImage, for url: URL) {
-        cache.setObject(image, forKey: url.absoluteString as NSString)
+    func image(for url: URL, maxPixelSize: CGFloat) -> UIImage? {
+        cache.object(forKey: cacheKey(for: url, maxPixelSize: maxPixelSize))
+    }
+
+    func store(_ image: UIImage, for url: URL, maxPixelSize: CGFloat) {
+        let pixelW = Int(image.size.width * image.scale)
+        let pixelH = Int(image.size.height * image.scale)
+        let cost = max(1, pixelW * pixelH * 4)
+        cache.setObject(image, forKey: cacheKey(for: url, maxPixelSize: maxPixelSize), cost: cost)
     }
 }
 
 struct CachedAsyncImage: View {
     let url: URL?
     var contentMode: ContentMode = .fill
+    var maxPixelSize: CGFloat = 360
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var loadedImage: UIImage?
@@ -489,37 +511,65 @@ struct CachedAsyncImage: View {
                 placeholderColor
             }
         }
-        .task(id: url) {
+        .task(id: "\(url?.absoluteString ?? "")#\(Int(maxPixelSize))") {
             await load()
         }
+    }
+
+    private static func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
+            return UIImage(data: data)
+        }
+        let thumbOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(16, Int(maxPixelSize))
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: cgImage)
     }
 
     private func load() async {
         failed = false
         guard let url = url else {
+            loadedImage = nil
             failed = true
             return
         }
-        if let cached = ImageCacheStore.shared.image(for: url) {
+        let targetSize = maxPixelSize
+        if let cached = ImageCacheStore.shared.image(for: url, maxPixelSize: targetSize) {
             loadedImage = cached
             return
         }
+        loadedImage = nil
         do {
             var request = URLRequest(url: url)
             request.timeoutInterval = 15
-            let (data, response) = try await URLSession.shared.data(for: request)
+            request.cachePolicy = .returnCacheDataElseLoad
+            let (data, response) = try await ImageCacheStore.shared.urlSession.data(for: request)
+            if Task.isCancelled { return }
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 failed = true
                 return
             }
-            if let img = UIImage(data: data) {
-                ImageCacheStore.shared.store(img, for: url)
+            let decoded = await Task.detached(priority: .userInitiated) {
+                Self.downsample(data: data, maxPixelSize: targetSize)
+            }.value
+            if Task.isCancelled { return }
+            if let img = decoded {
+                ImageCacheStore.shared.store(img, for: url, maxPixelSize: targetSize)
                 await MainActor.run { loadedImage = img }
             } else {
                 failed = true
             }
         } catch {
-            failed = true
+            if !Task.isCancelled {
+                failed = true
+            }
         }
     }
 }

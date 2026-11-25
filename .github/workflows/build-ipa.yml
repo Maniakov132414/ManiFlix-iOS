@@ -43,7 +43,7 @@ jobs:
           import plistlib
           app_pl = plistlib.loads(open('ManiFlix/Info.plist', 'rb').read())
           wid_pl = plistlib.loads(open('ManiFlixWidgets/Info.plist', 'rb').read())
-          assert app_pl.get('CFBundleShortVersionString') == '1.0.9', app_pl
+          assert app_pl.get('CFBundleShortVersionString') == '1.1.0', app_pl
           assert app_pl.get('LSRequiresIPhoneOS') is True, app_pl
           assert app_pl.get('UIRequiresFullScreen') is False, app_pl
           assert wid_pl.get('NSExtension', {}).get('NSExtensionPointIdentifier') == 'com.apple.widgetkit-extension', wid_pl
@@ -65,8 +65,8 @@ jobs:
             -archivePath /tmp/ManiFlix-Modern-NoPlug.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             APP_BUNDLE_ID=bond.maniakov.maniflix \
-            MARKETING_VERSION=1.0.9 \
-            CURRENT_PROJECT_VERSION=11 \
+            MARKETING_VERSION=1.1.0 \
+            CURRENT_PROJECT_VERSION=12 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -90,8 +90,8 @@ jobs:
             -archivePath /tmp/ManiFlix-Modern-Full.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             APP_BUNDLE_ID=bond.maniakov.maniflix.full \
-            MARKETING_VERSION=1.0.9 \
-            CURRENT_PROJECT_VERSION=11 \
+            MARKETING_VERSION=1.1.0 \
+            CURRENT_PROJECT_VERSION=12 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -118,8 +118,8 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
             APP_BUNDLE_ID=bond.maniakov.maniflix.legacy \
-            MARKETING_VERSION=1.0.9 \
-            CURRENT_PROJECT_VERSION=11 \
+            MARKETING_VERSION=1.1.0 \
+            CURRENT_PROJECT_VERSION=12 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -143,8 +143,8 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
             APP_BUNDLE_ID=bond.maniakov.maniflix.legacy.full \
-            MARKETING_VERSION=1.0.9 \
-            CURRENT_PROJECT_VERSION=11 \
+            MARKETING_VERSION=1.1.0 \
+            CURRENT_PROJECT_VERSION=12 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -171,8 +171,8 @@ jobs:
                   names = zf.namelist()
                   assert not any("_CodeSignature" in n for n in names), f"{name}: found stale _CodeSignature"
                   pl = plistlib.loads(zf.read("Payload/ManiFlix.app/Info.plist"))
-                  assert pl.get("CFBundleShortVersionString") == "1.0.9", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
-                  assert pl.get("CFBundleVersion") == "11", f"{name}: wrong build {pl.get('CFBundleVersion')}"
+                  assert pl.get("CFBundleShortVersionString") == "1.1.0", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
+                  assert pl.get("CFBundleVersion") == "12", f"{name}: wrong build {pl.get('CFBundleVersion')}"
                   assert pl.get("LSRequiresIPhoneOS") is True, f"{name}: missing LSRequiresIPhoneOS"
                   assert pl.get("UIRequiresFullScreen") is False, f"{name}: missing UIRequiresFullScreen=False"
                   assert "UILaunchScreen" in pl, f"{name}: missing UILaunchScreen"
@@ -183,7 +183,7 @@ jobs:
                       assert not any("/PlugIns/" in n for n in names), f"{name}: unexpected PlugIns"
                   else:
                       wpl = plistlib.loads(zf.read("Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/Info.plist"))
-                      assert wpl.get("CFBundleShortVersionString") == "1.0.9", f"{name}: wrong widget version"
+                      assert wpl.get("CFBundleShortVersionString") == "1.1.0", f"{name}: wrong widget version"
                       assert wpl.get("NSExtension", {}).get("NSExtensionPointIdentifier") == "com.apple.widgetkit-extension", f"{name}: widget missing NSExtension"
 
                   print(f"OK {name}: bid={pl.get('CFBundleIdentifier')} ver={pl.get('CFBundleShortVersionString')} ({pl.get('CFBundleVersion')}) minOS={pl.get('MinimumOSVersion')} size={os.path.getsize(path)}")
@@ -196,16 +196,16 @@ jobs:
           path: dist/*.ipa
           retention-days: 30
 
-      - name: Publish GitHub Release v1.0.9
+      - name: Publish GitHub Release v1.1.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.9
-          name: ManiFlix 1.0.9
+          tag_name: v1.1.0
+          name: ManiFlix 1.1.0
           body: |
-            ## ManiFlix 1.0.9
-            - Nâng cấp Speedtest trên trang Kiểm tra mạng & Thiết bị: đo tải xuống 4 luồng song song (`URLSession.shared.bytes(for:)`, 5 MB x 4 = 20 MB), tải lên 2 luồng song song (1 MB x 2) và Ping/Jitter Cloudflare có warm-up kèm fallback máy chủ ManiFlix.
-            - Mặc định tắt Live Probe (`TẮT`), tự động chạy 1 lần Speedtest chuẩn khi mở màn hình và chỉ thăm dò `1 MB` mỗi `8s` khi bật Live Probe.
-            - Giữ nguyên 100% SF Symbols, đa nhiệm iPadOS, Giao diện Taurus Live Preview, PiP và Spatial Audio.
+            ## ManiFlix 1.1.0
+            - Tối ưu hiệu năng cuộn 120Hz ProMotion & giảm RAM: giải mã và giảm kích thước ảnh poster ngoài luồng chính bằng `ImageIO` (`360px` card / `960px` banner / `64px` nền), bổ sung `URLCache` 64 MB trên ổ đĩa và `NSCache` giới hạn 45 MB.
+            - Tối ưu nền Ambient Artwork dùng ảnh `64px` kết hợp `.drawingGroup()`, chuyển các dải phim ngang sang `LazyHStack` và loại bỏ đổ bóng nặng trên từng thẻ khi cuộn.
+            - Giữ nguyên Speedtest 4 luồng Cloudflare, 100% SF Symbols, đa nhiệm iPadOS, Giao diện Taurus Live Preview, PiP và Spatial Audio.
             - **Link Repo**: `https://phim.maniakov.bond/repo.json`
           files: dist/*.ipa
           overwrite_files: true

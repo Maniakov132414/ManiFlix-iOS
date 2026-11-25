@@ -135,14 +135,13 @@ struct MovieDetailView: View {
 
     private var headerBanner: some View {
         VStack(spacing: 14) {
-            CachedAsyncImage(url: heroArtworkURL)
+            CachedAsyncImage(url: heroArtworkURL, maxPixelSize: 480)
                 .frame(width: 158, height: 228)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.6)
                 )
-                .shadow(color: Color.black.opacity(ManiFlixTheme.isLight(colorScheme) ? 0.22 : 0.55), radius: 20, x: 0, y: 12)
                 .padding(.top, 10)
 
             VStack(spacing: 5) {
@@ -470,7 +469,7 @@ struct MovieDetailView: View {
                 .padding(.horizontal, panePadding)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 11) {
+                LazyHStack(alignment: .top, spacing: 11) {
                     ForEach(relatedMovies) { item in
                         NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: item)) {
                             MoviePosterCard(movie: item)
