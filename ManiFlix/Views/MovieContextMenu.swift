@@ -34,10 +34,18 @@ struct MovieContextMenuItems: View {
             Label("Đề xuất ít lại", systemImage: "hand.thumbsdown")
         }
 
-        Button(role: .destructive) {
-            appState.blockMovie(movie)
-        } label: {
-            Label("Không đề xuất phim này nữa", systemImage: "eye.slash")
+        if appState.isBlocked(slug: movie.slug) {
+            Button {
+                appState.unblockMovie(slug: movie.slug)
+            } label: {
+                Label("Hiện lại phim này", systemImage: "eye")
+            }
+        } else {
+            Button(role: .destructive) {
+                appState.blockMovie(movie)
+            } label: {
+                Label("Không đề xuất phim này nữa", systemImage: "eye.slash")
+            }
         }
 
         if appState.hasHistory(slug: movie.slug) {
@@ -60,11 +68,7 @@ struct MovieContextMenuItems: View {
 
     private func shareMovieURL() {
         let shareURL = URL(string: "\(prefs.normalizedBaseURL)/watch/\(movie.slug)") ?? URL(string: prefs.normalizedBaseURL)!
-        let vc = UIActivityViewController(activityItems: [movie.name, shareURL], applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let root = scene.windows.first?.rootViewController {
-            root.present(vc, animated: true)
-        }
+        AppState.presentShareSheet(items: [movie.name, shareURL])
     }
 }
 

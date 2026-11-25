@@ -14,20 +14,15 @@ final class UpdateManager: ObservableObject {
     private let snoozeUntilKey = "update.softSnoozeUntil"
 
     var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.3"
     }
 
-    var buildFlavorLabel: String {
-        let hasPlugIns = FileManager.default.fileExists(
-            atPath: Bundle.main.bundlePath + "/PlugIns"
-        )
-        let osFloor: String
-        if #available(iOS 26.0, *) {
-            osFloor = "iOS 26+ Liquid Glass"
-        } else {
-            osFloor = "iOS Legacy/Adaptive"
-        }
-        return "\(osFloor) • \(hasPlugIns ? "Full (PlugIns)" : "No Plugins")"
+    var currentBuild: String {
+        (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "5"
+    }
+
+    var displayVersion: String {
+        "\(currentVersion) (\(currentBuild))"
     }
 
     func checkForUpdates(manual: Bool = false) async {
@@ -76,14 +71,14 @@ final class UpdateManager: ObservableObject {
 
     func recommendedVariantURL() -> URL? {
         let hasPlugIns = FileManager.default.fileExists(atPath: Bundle.main.bundlePath + "/PlugIns")
-        let isIOS26Plus: Bool
-        if #available(iOS 26.0, *) { isIOS26Plus = true } else { isIOS26Plus = false }
+        let bundleId = Bundle.main.bundleIdentifier ?? ""
+        let isLegacyBuild = bundleId.contains(".legacy")
 
         if let variants = config?.variants, !variants.isEmpty {
             if let exact = variants.first(where: { v in
-                let want26 = v.key.contains("26")
+                let wantLegacy = v.key.hasPrefix("legacy")
                 let wantPlug = v.hasPlugins ?? !v.key.lowercased().contains("noplug")
-                return want26 == isIOS26Plus && wantPlug == hasPlugIns
+                return wantLegacy == isLegacyBuild && wantPlug == hasPlugIns
             }) {
                 return URL(string: exact.downloadUrl)
             }

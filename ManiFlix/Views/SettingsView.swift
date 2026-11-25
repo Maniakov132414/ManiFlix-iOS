@@ -5,7 +5,6 @@ struct SettingsView: View {
     @ObservedObject private var spatial = AudioSpatialEngine.shared
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var updates = UpdateManager.shared
-    @State private var showHiddenMovies = false
 
     var body: some View {
         Form {
@@ -32,6 +31,46 @@ struct SettingsView: View {
                         Text("Đăng nhập hoặc tạo tài khoản")
                     }
                 }
+            }
+
+            Section("Giao diện") {
+                HStack(spacing: 12) {
+                    Text("Màu chủ đạo")
+                    Spacer()
+                    ForEach(AccentPreset.allCases) { preset in
+                        Button {
+                            prefs.accentPreset = preset
+                            Haptics.impact(.light)
+                        } label: {
+                            Circle()
+                                .fill(preset.color)
+                                .frame(width: 22, height: 22)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.white, lineWidth: prefs.accentPreset == preset ? 2.2 : 0)
+                                )
+                                .scaleEffect(prefs.accentPreset == preset ? 1.1 : 1.0)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+
+                Picker("Phong cách hiển thị", selection: $prefs.glassStyle) {
+                    ForEach(GlassUIStyle.allCases) { st in
+                        Text(st.title).tag(st)
+                    }
+                }
+
+                Toggle("Ánh nền theo ảnh phim", isOn: $prefs.ambientArtworkEnabled)
+                Toggle("Nền đen thuần (OLED)", isOn: $prefs.oledBlackEnabled)
+
+                Picker("Số cột hiển thị", selection: $prefs.gridColumnsPhone) {
+                    Text("2 cột").tag(2)
+                    Text("3 cột").tag(3)
+                }
+
+                Toggle("Rung phản hồi", isOn: $prefs.hapticsEnabled)
             }
 
             Section {
@@ -79,42 +118,16 @@ struct SettingsView: View {
                     Slider(value: $prefs.comfortGain, in: 0.35...1.0, step: 0.05)
                 }
             } header: {
-                Text("Spatial Audio & Âm thanh")
+                Text("Âm thanh")
             }
 
-            Section("Giao diện") {
-                Picker("Hiệu ứng nền", selection: $prefs.glassStyle) {
-                    ForEach(GlassUIStyle.allCases) { st in
-                        Text(st.title).tag(st)
-                    }
-                }
-
-                Toggle("Nền đen OLED", isOn: $prefs.oledBlackEnabled)
-
-                Picker("Màu chủ đạo", selection: $prefs.accentPreset) {
-                    ForEach(AccentPreset.allCases) { preset in
-                        HStack {
-                            Circle().fill(preset.color).frame(width: 10, height: 10)
-                            Text(preset.label)
-                        }.tag(preset)
-                    }
-                }
-
-                Picker("Bố cục lưới phim", selection: $prefs.gridColumnsPhone) {
-                    Text("2 cột").tag(2)
-                    Text("3 cột").tag(3)
-                }
-
-                Toggle("Rung phản hồi", isOn: $prefs.hapticsEnabled)
-            }
-
-            Section("Trình phát & Picture in Picture") {
-                Toggle("Tự mở Picture in Picture khi thoát ra màn hình chính", isOn: $prefs.autoPiP)
-                Toggle("Tự xoay ngang khi bắt đầu xem", isOn: $prefs.autoRotateLandscape)
+            Section("Trình phát") {
+                Toggle("Tự mở Picture in Picture", isOn: $prefs.autoPiP)
+                Toggle("Tự xoay ngang khi xem", isOn: $prefs.autoRotateLandscape)
                 Toggle("Tự cắt đoạn quảng cáo", isOn: $prefs.autoCutAds)
                 Toggle("Tự chuyển tập tiếp theo", isOn: $prefs.autoNextEpisode)
 
-                Picker("Đoạn mở đầu / kết thúc", selection: $prefs.introSkipBehavior) {
+                Picker("Mở đầu & kết thúc", selection: $prefs.introSkipBehavior) {
                     ForEach(IntroSkipBehavior.allCases) { m in
                         Text(m.title).tag(m)
                     }
@@ -132,12 +145,6 @@ struct SettingsView: View {
                     Text("2.0x").tag(2.0)
                     Text("2.5x").tag(2.5)
                     Text("3.0x").tag(3.0)
-                }
-
-                Picker("Nguồn phát ưu tiên", selection: $prefs.preferredSource) {
-                    ForEach(PreferredStreamSource.allCases) { src in
-                        Text(src.title).tag(src)
-                    }
                 }
 
                 Picker("Bộ đệm tải trước", selection: $prefs.forwardBufferSeconds) {
@@ -158,15 +165,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Phiên bản")
                     Spacer()
-                    Text(updates.currentVersion)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                HStack {
-                    Text("Bản dựng")
-                    Spacer()
-                    Text(updates.buildFlavorLabel)
+                    Text(updates.displayVersion)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -188,17 +187,6 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            }
-
-            Section("Kết nối") {
-                TextField("Địa chỉ máy chủ", text: $prefs.baseURLString)
-                    .keyboardType(.URL)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-
-                Button("Phim đã ẩn (\(appState.blockedMovies.count))") {
-                    showHiddenMovies = true
-                }
 
                 Button("Đặt lại mặc định", role: .destructive) {
                     prefs.resetToDefaults()
@@ -206,38 +194,9 @@ struct SettingsView: View {
                 }
             }
         }
+        .adaptiveHiddenScrollBackground()
+        .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
         .navigationTitle("Cài đặt")
         .adaptiveSoftScrollEdge()
-        .sheet(isPresented: $showHiddenMovies) {
-            NavigationView {
-                List {
-                    if appState.blockedMovies.isEmpty {
-                        Text("Chưa có phim nào bị ẩn.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(appState.blockedMovies) { item in
-                            HStack {
-                                Text(item.name)
-                                    .font(.subheadline)
-                                Spacer()
-                                Button("Hiện lại") {
-                                    appState.unblockMovie(slug: item.slug)
-                                }
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(prefs.accentPreset.color)
-                            }
-                        }
-                    }
-                }
-                .navigationTitle("Phim đã ẩn")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Xong") { showHiddenMovies = false }
-                    }
-                }
-            }
-            .preferredColorScheme(.dark)
-        }
     }
 }

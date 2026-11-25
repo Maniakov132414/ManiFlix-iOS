@@ -8,43 +8,27 @@ struct LibraryView: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("Danh mục", selection: $selectedSegment) {
-                Text("Lịch sử (\(appState.history.count))").tag(0)
-                Text("Đã lưu (\(appState.favorites.count))").tag(1)
+                Text("Đang xem").tag(0)
+                Text("Đã lưu").tag(1)
+                Text("Đã ẩn (\(appState.blockedMovies.count))").tag(2)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
-            if !appState.isLoggedIn {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 44))
-                        .foregroundColor(Color(white: 0.55))
-                    Text("Đồng bộ tủ phim")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Text("Đăng nhập để giữ lịch sử xem và danh sách phim đã lưu trên mọi thiết bị.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                    Button {
-                        appState.showAuthSheet = true
-                    } label: {
-                        Text("Đăng nhập")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 10)
-                    }
-                    .adaptiveGlassCapsule(tint: prefs.accentPreset.color)
-                    Spacer()
-                }
-            } else if selectedSegment == 0 {
+            if selectedSegment == 0 {
                 historyList
+            } else if selectedSegment == 1 {
+                if appState.isLoggedIn {
+                    favoritesGrid
+                } else {
+                    loginPrompt(
+                        title: "Đồng bộ danh sách đã lưu",
+                        subtitle: "Đăng nhập để lưu và đồng bộ các phim bạn yêu thích trên mọi thiết bị."
+                    )
+                }
             } else {
-                favoritesGrid
+                blockedMoviesList
             }
         }
         .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
@@ -54,18 +38,60 @@ struct LibraryView: View {
         }
     }
 
+    private func loginPrompt(title: String, subtitle: String) -> some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 44))
+                .foregroundColor(Color(white: 0.55))
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.white)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Button {
+                appState.showAuthSheet = true
+            } label: {
+                Text("Đăng nhập")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 10)
+            }
+            .adaptiveGlassCapsule(tint: prefs.accentPreset.color)
+            Spacer()
+        }
+    }
+
     private var historyList: some View {
         Group {
             if appState.history.isEmpty {
-                emptyState(icon: "clock", text: "Chưa có phim đang xem.")
+                VStack(spacing: 12) {
+                    if !appState.isLoggedIn {
+                        syncBanner
+                    }
+                    emptyState(icon: "clock", text: "Chưa có phim đang xem.")
+                }
             } else {
                 List {
+                    if !appState.isLoggedIn {
+                        syncBanner
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
                     ForEach(appState.history) { entry in
                         NavigationLink(destination: MovieDetailView(slug: entry.slug, seedMovie: nil)) {
                             HStack(spacing: 12) {
                                 CachedAsyncImage(url: entry.displayPosterURL)
-                                    .frame(width: 92, height: 56)
+                                    .frame(width: 96, height: 58)
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                                    )
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.name ?? entry.slug)
@@ -92,8 +118,34 @@ struct LibraryView: View {
                     }
                 }
                 .listStyle(.plain)
+                .adaptiveHiddenScrollBackground()
             }
         }
+    }
+
+    private var syncBanner: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Chưa đăng nhập")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                Text("Đăng nhập để đồng bộ lịch sử xem trên nhiều thiết bị.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Button("Đăng nhập") {
+                appState.showAuthSheet = true
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(prefs.accentPreset.color)
+            .clipShape(Capsule())
+        }
+        .padding(12)
+        .adaptiveGlassCard(cornerRadius: 12)
     }
 
     private var favoritesGrid: some View {
@@ -131,8 +183,72 @@ struct LibraryView: View {
                         }
                     }
                     .padding(16)
+                    .padding(.bottom, 76)
                 }
                 .adaptiveSoftScrollEdge()
+            }
+        }
+    }
+
+    private var blockedMoviesList: some View {
+        Group {
+            if appState.blockedMovies.isEmpty {
+                emptyState(icon: "eye.slash", text: "Chưa có phim nào bị ẩn.")
+            } else {
+                List {
+                    ForEach(appState.blockedMovies) { item in
+                        HStack(spacing: 12) {
+                            NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: nil)) {
+                                HStack(spacing: 12) {
+                                    CachedAsyncImage(url: ImageURLResolver.resolve(item.poster))
+                                        .frame(width: 52, height: 74)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                                        )
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.name)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundColor(.white)
+                                            .lineLimit(2)
+                                        Text("Đang ẩn khỏi trang chủ & tìm kiếm")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Button {
+                                appState.unblockMovie(slug: item.slug)
+                            } label: {
+                                Text("Hiện lại")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(prefs.accentPreset.color)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 3)
+                        .listRowBackground(Color.clear)
+                        .swipeActions {
+                            Button {
+                                appState.unblockMovie(slug: item.slug)
+                            } label: {
+                                Label("Hiện lại", systemImage: "eye")
+                            }
+                            .tint(prefs.accentPreset.color)
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .adaptiveHiddenScrollBackground()
             }
         }
     }

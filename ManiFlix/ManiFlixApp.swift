@@ -27,6 +27,7 @@ struct ManiFlixApp: App {
                     handleIncomingURL(url)
                 }
                 .fullScreenCover(isPresented: $appState.isPlayerPresented, onDismiss: {
+                    OrientationController.forcePortrait()
                     appState.dismissPlayerKeepPiPIfNeeded()
                 }) {
                     if let engine = appState.activeEngine {
@@ -73,7 +74,7 @@ struct RootTabScaffold: View {
                 #if compiler(>=6.2)
                 if #available(iOS 26.0, *), prefs.glassStyle.shouldUseLiquidGlass {
                     TabView {
-                        Tab("Khám phá", systemImage: "film") {
+                        Tab("Trang chủ", systemImage: "play.square.stack") {
                             navWrapper { DiscoverView() }
                         }
                         Tab("Tủ phim", systemImage: "bookmark") {
@@ -128,60 +129,59 @@ struct RootTabScaffold: View {
     }
 
     private func miniPiPBar(engine: PlayerEngine) -> some View {
-        HStack(spacing: 10) {
-            CachedAsyncImage(url: engine.movie.displayPosterURL)
-                .frame(width: 34, height: 46)
-                .cornerRadius(6)
+        HStack(spacing: 11) {
+            Button {
+                appState.isPlayerPresented = true
+            } label: {
+                HStack(spacing: 11) {
+                    CachedAsyncImage(url: engine.movie.displayPosterURL)
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.35), radius: 4, x: 0, y: 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(engine.movie.name)
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                Text(engine.isPiPActive ? "Đang phát trong Picture in Picture" : (engine.currentEpisode?.name ?? "Đang phát"))
-                    .font(.caption2)
-                    .foregroundColor(Color(white: 0.62))
-                    .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(engine.movie.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        Text(engine.isPiPActive ? "Đang phát thu nhỏ" : (engine.currentEpisode?.name ?? "Đang phát"))
+                            .font(.caption2)
+                            .foregroundColor(Color(white: 0.65))
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                }
+                .contentShape(Rectangle())
             }
-
-            Spacer()
+            .buttonStyle(.plain)
 
             Button {
                 engine.togglePlayPause()
             } label: {
                 Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.subheadline)
+                    .font(.body.weight(.semibold))
                     .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-            }
-
-            Button {
-                appState.isPlayerPresented = true
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 34, height: 34)
             }
 
             Button {
                 appState.stopPlaybackCompletely()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.caption)
-                    .foregroundColor(Color(white: 0.7))
-                    .frame(width: 28, height: 32)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Color(white: 0.72))
+                    .frame(width: 28, height: 34)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .adaptiveGlassCard(cornerRadius: 14, interactive: true)
+        .adaptiveGlassCard(cornerRadius: 16, interactive: true)
     }
 
     private var legacyTabScaffold: some View {
         TabView {
             navWrapper { DiscoverView() }
-                .tabItem { Label("Khám phá", systemImage: "film") }
+                .tabItem { Label("Trang chủ", systemImage: "play.square.stack") }
 
             navWrapper { CatalogSearchView() }
                 .tabItem { Label("Tìm kiếm", systemImage: "magnifyingglass") }

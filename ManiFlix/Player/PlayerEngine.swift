@@ -203,8 +203,8 @@ final class PlayerEngine: NSObject, ObservableObject {
             return
         }
 
-        usingCleanSource = (AppPreferences.shared.preferredSource == .cleanFirst)
-        startPlaybackStream(for: ep, useClean: usingCleanSource)
+        usingCleanSource = true
+        startPlaybackStream(for: ep, useClean: true)
 
         let epKey = ep.slug.isEmpty ? "\(episodeIndex)" : ep.slug
         let titleHint = (movie.origin_name?.isEmpty == false ? movie.origin_name : movie.name) ?? movie.name
@@ -229,10 +229,10 @@ final class PlayerEngine: NSObject, ObservableObject {
         let resolvedURL: URL?
         if useClean, let clean = ManiFlixAPI.shared.cleanM3U8URL(from: rawM3U8) {
             resolvedURL = clean
-            currentSourceLabel = "HLS lọc quảng cáo"
+            currentSourceLabel = "Chuẩn"
         } else {
             resolvedURL = URL(string: rawM3U8)
-            currentSourceLabel = "HLS gốc"
+            currentSourceLabel = "Dự phòng"
         }
 
         guard let url = resolvedURL else {

@@ -92,29 +92,19 @@ enum ExternalPlayerOption: String, CaseIterable, Identifiable {
     }
 }
 
-enum PreferredStreamSource: String, CaseIterable, Identifiable {
-    case cleanFirst
-    case rawFirst
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .cleanFirst: return "Luồng đã lọc quảng cáo"
-        case .rawFirst: return "Luồng CDN gốc"
-        }
-    }
-}
-
 final class AppPreferences: ObservableObject {
     static let shared = AppPreferences()
     private let defaults = UserDefaults.standard
+    let baseURL = "https://phim.maniakov.bond"
 
     @Published var glassStyle: GlassUIStyle {
         didSet { defaults.set(glassStyle.rawValue, forKey: "pref.glassStyle") }
     }
     @Published var oledBlackEnabled: Bool {
         didSet { defaults.set(oledBlackEnabled, forKey: "pref.oledBlack") }
+    }
+    @Published var ambientArtworkEnabled: Bool {
+        didSet { defaults.set(ambientArtworkEnabled, forKey: "pref.ambientArtwork") }
     }
     @Published var accentPreset: AccentPreset {
         didSet { defaults.set(accentPreset.rawValue, forKey: "pref.accentPreset") }
@@ -151,9 +141,6 @@ final class AppPreferences: ObservableObject {
     @Published var longPressSpeed: Double {
         didSet { defaults.set(longPressSpeed, forKey: "pref.longPressSpeed") }
     }
-    @Published var preferredSource: PreferredStreamSource {
-        didSet { defaults.set(preferredSource.rawValue, forKey: "pref.preferredSource") }
-    }
     @Published var forwardBufferSeconds: Double {
         didSet { defaults.set(forwardBufferSeconds, forKey: "pref.forwardBufferSeconds") }
     }
@@ -169,18 +156,18 @@ final class AppPreferences: ObservableObject {
     @Published var externalPlayer: ExternalPlayerOption {
         didSet { defaults.set(externalPlayer.rawValue, forKey: "pref.externalPlayer") }
     }
-    @Published var baseURLString: String {
-        didSet { defaults.set(baseURLString, forKey: "pref.baseURLString") }
-    }
 
     private init() {
         #if LEGACY_UI_DEFAULT
         let defaultGlass: GlassUIStyle = .legacy
+        let defaultOled = true
         #else
         let defaultGlass: GlassUIStyle = .adaptive
+        let defaultOled = false
         #endif
         self.glassStyle = GlassUIStyle(rawValue: defaults.string(forKey: "pref.glassStyle") ?? "") ?? defaultGlass
-        self.oledBlackEnabled = defaults.object(forKey: "pref.oledBlack") as? Bool ?? true
+        self.oledBlackEnabled = defaults.object(forKey: "pref.oledBlack") as? Bool ?? defaultOled
+        self.ambientArtworkEnabled = defaults.object(forKey: "pref.ambientArtwork") as? Bool ?? true
         self.accentPreset = AccentPreset(rawValue: defaults.string(forKey: "pref.accentPreset") ?? "") ?? .crimson
         let cols = defaults.integer(forKey: "pref.gridColumnsPhone")
         self.gridColumnsPhone = (cols == 2 || cols == 3) ? cols : 3
@@ -198,29 +185,27 @@ final class AppPreferences: ObservableObject {
         self.doubleTapSeekSeconds = [5, 10, 15, 30].contains(seek) ? seek : 10
         let speed = defaults.double(forKey: "pref.longPressSpeed")
         self.longPressSpeed = speed >= 1.25 ? speed : 2.0
-        self.preferredSource = PreferredStreamSource(rawValue: defaults.string(forKey: "pref.preferredSource") ?? "") ?? .cleanFirst
         let buf = defaults.double(forKey: "pref.forwardBufferSeconds")
         self.forwardBufferSeconds = buf >= 5 ? buf : 45
         self.autoCutAds = defaults.object(forKey: "pref.autoCutAds") as? Bool ?? true
         self.introSkipBehavior = IntroSkipBehavior(rawValue: defaults.string(forKey: "pref.introSkipBehavior") ?? "") ?? .button
         self.autoNextEpisode = defaults.object(forKey: "pref.autoNextEpisode") as? Bool ?? true
         self.externalPlayer = ExternalPlayerOption(rawValue: defaults.string(forKey: "pref.externalPlayer") ?? "") ?? .internalPlayer
-
-        let savedBase = defaults.string(forKey: "pref.baseURLString") ?? "https://phim.maniakov.bond"
-        self.baseURLString = savedBase.isEmpty ? "https://phim.maniakov.bond" : savedBase
     }
 
     var normalizedBaseURL: String {
-        let trimmed = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasSuffix("/") {
-            return String(trimmed.dropLast())
-        }
-        return trimmed.isEmpty ? "https://phim.maniakov.bond" : trimmed
+        baseURL
     }
 
     func resetToDefaults() {
-        glassStyle = .adaptive
+        #if LEGACY_UI_DEFAULT
+        glassStyle = .legacy
         oledBlackEnabled = true
+        #else
+        glassStyle = .adaptive
+        oledBlackEnabled = false
+        #endif
+        ambientArtworkEnabled = true
         accentPreset = .crimson
         gridColumnsPhone = 3
         hapticsEnabled = true
@@ -232,12 +217,10 @@ final class AppPreferences: ObservableObject {
         autoPiP = true
         doubleTapSeekSeconds = 10
         longPressSpeed = 2.0
-        preferredSource = .cleanFirst
         forwardBufferSeconds = 45
         autoCutAds = true
         introSkipBehavior = .button
         autoNextEpisode = true
         externalPlayer = .internalPlayer
-        baseURLString = "https://phim.maniakov.bond"
     }
 }

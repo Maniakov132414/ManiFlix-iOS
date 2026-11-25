@@ -6,53 +6,52 @@ struct MoviePosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .bottomLeading) {
                 CachedAsyncImage(url: movie.displayPosterURL)
-                    .frame(height: prefs.gridColumnsPhone == 2 ? 236 : 166)
+                    .frame(height: prefs.gridColumnsPhone == 2 ? 238 : 168)
                     .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.6)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5)
                     )
+                    .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 4)
 
-                HStack {
-                    Menu {
-                        MovieContextMenuItems(movie: movie)
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 24, height: 24)
-                            .background(Color.black.opacity(0.65))
-                            .clipShape(Circle())
-                    }
-                    .padding(6)
-
-                    Spacer()
-
-                    if let badge = movie.quality ?? movie.episode_current, !badge.isEmpty {
-                        Text(badge)
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2.5)
-                            .background(Color.black.opacity(0.72))
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                            .padding(6)
-                    }
+                if let badge = movie.quality ?? movie.episode_current, !badge.isEmpty {
+                    Text(badge)
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(Color.black.opacity(0.72))
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .padding(6)
                 }
             }
 
-            Text(movie.name)
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundColor(.white)
-                .lineLimit(1)
+            HStack(alignment: .center, spacing: 4) {
+                Text(movie.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer(minLength: 2)
+
+                Menu {
+                    MovieContextMenuItems(movie: movie)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color(white: 0.65))
+                        .frame(width: 24, height: 22)
+                        .contentShape(Rectangle())
+                }
+            }
 
             if let year = movie.year?.value, year > 0 {
                 Text("\(String(year)) • \(movie.lang ?? "Vietsub")")
                     .font(.system(size: 11))
-                    .foregroundColor(Color(white: 0.52))
+                    .foregroundColor(Color(white: 0.55))
                     .lineLimit(1)
             }
         }
@@ -69,6 +68,7 @@ struct DiscoverView: View {
     @State private var singleMovies: [MovieItem] = []
     @State private var animeMovies: [MovieItem] = []
     @State private var selectedGenreTag: String = "Tất cả"
+    @State private var heroSelection: Int = 0
     @State private var isLoading = true
     @State private var errorMsg: String?
     @State private var showAccountSheet = false
@@ -88,91 +88,104 @@ struct DiscoverView: View {
         animeMovies.filter { !appState.isBlocked(slug: $0.slug) }
     }
 
+    private var currentAmbientURL: URL? {
+        let featured = Array(visibleHero.prefix(5))
+        return featured[safe: heroSelection]?.displayPosterURL ?? featured.first?.displayPosterURL
+    }
+
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 22) {
-                if let err = errorMsg, heroMovies.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "wifi.slash")
-                            .font(.title2)
-                            .foregroundColor(Color(white: 0.55))
-                        Text(err)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        Button("Thử lại") {
-                            Task { await loadAll() }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(prefs.accentPreset.color)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 80)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(categories, id: \.self) { cat in
-                                Button {
-                                    selectedGenreTag = cat
-                                    Haptics.impact(.light)
-                                } label: {
-                                    Text(cat)
-                                        .font(.system(size: 13, weight: selectedGenreTag == cat ? .semibold : .regular))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 7)
-                                }
-                                .adaptiveGlassCapsule(
-                                    interactive: true,
-                                    tint: selectedGenreTag == cat ? prefs.accentPreset.color : nil
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
+        ZStack(alignment: .top) {
+            ManiFlixTheme.background(oled: prefs.oledBlackEnabled)
+                .ignoresSafeArea()
 
-                    if !visibleHero.isEmpty {
-                        TabView {
-                            ForEach(visibleHero.prefix(5)) { movie in
-                                NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
-                                    heroCard(for: movie)
-                                }
-                                .buttonStyle(.plain)
-                                .movieCardContextMenu(movie)
+            AmbientArtworkBackground(url: currentAmbientURL, oled: prefs.oledBlackEnabled, height: 390)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    if let err = errorMsg, heroMovies.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "wifi.slash")
+                                .font(.title2)
+                                .foregroundColor(Color(white: 0.55))
+                            Text(err)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            Button("Thử lại") {
+                                Task { await loadAll() }
                             }
+                            .buttonStyle(.borderedProminent)
+                            .tint(prefs.accentPreset.color)
                         }
-                        .frame(height: 288)
-                        .tabViewStyle(.page(indexDisplayMode: .automatic))
-                    } else if isLoading {
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(Color.white.opacity(0.05))
-                            .frame(height: 276)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 80)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(categories, id: \.self) { cat in
+                                    Button {
+                                        selectedGenreTag = cat
+                                        Haptics.impact(.light)
+                                    } label: {
+                                        Text(cat)
+                                            .font(.system(size: 13, weight: selectedGenreTag == cat ? .semibold : .regular))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 7)
+                                    }
+                                    .adaptiveGlassCapsule(
+                                        interactive: true,
+                                        tint: selectedGenreTag == cat ? prefs.accentPreset.color : nil
+                                    )
+                                }
+                            }
                             .padding(.horizontal, 16)
-                    }
+                        }
 
-                    if !appState.history.isEmpty {
-                        continueWatchingRail
-                    }
+                        if !visibleHero.isEmpty {
+                            let featured = Array(visibleHero.prefix(5))
+                            TabView(selection: $heroSelection) {
+                                ForEach(Array(featured.enumerated()), id: \.element.id) { idx, movie in
+                                    NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
+                                        heroCard(for: movie)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .movieCardContextMenu(movie)
+                                    .tag(idx)
+                                }
+                            }
+                            .frame(height: 292)
+                            .tabViewStyle(.page(indexDisplayMode: .automatic))
+                        } else if isLoading {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.05))
+                                .frame(height: 278)
+                                .padding(.horizontal, 16)
+                        }
 
-                    if selectedGenreTag == "Tất cả" || selectedGenreTag == "Phim bộ" {
-                        horizontalRail(title: "Phim bộ mới", items: visibleSeries)
-                    }
-                    if selectedGenreTag == "Tất cả" || selectedGenreTag == "Phim lẻ" {
-                        horizontalRail(title: "Phim lẻ", items: visibleSingle)
-                    }
-                    if selectedGenreTag == "Tất cả" || selectedGenreTag == "Hoạt hình" {
-                        horizontalRail(title: "Hoạt hình", items: visibleAnime)
-                    }
+                        if !appState.history.isEmpty {
+                            continueWatchingRail
+                        }
 
-                    latestGridSection
+                        if selectedGenreTag == "Tất cả" || selectedGenreTag == "Phim bộ" {
+                            horizontalRail(title: "Phim bộ mới", items: visibleSeries)
+                        }
+                        if selectedGenreTag == "Tất cả" || selectedGenreTag == "Phim lẻ" {
+                            horizontalRail(title: "Phim lẻ tuyển chọn", items: visibleSingle)
+                        }
+                        if selectedGenreTag == "Tất cả" || selectedGenreTag == "Hoạt hình" {
+                            horizontalRail(title: "Hoạt hình & Anime", items: visibleAnime)
+                        }
+
+                        latestGridSection
+                    }
                 }
+                .padding(.top, 8)
+                .padding(.bottom, 92)
             }
-            .padding(.top, 10)
-            .padding(.bottom, 92)
         }
-        .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
         .adaptiveSoftScrollEdge()
-        .navigationTitle("ManiFlix")
+        .navigationTitle("Trang chủ")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -180,8 +193,8 @@ struct DiscoverView: View {
                     Haptics.impact(.light)
                 } label: {
                     Image(systemName: appState.isLoggedIn ? "person.crop.circle.fill" : "person.crop.circle")
-                        .font(.system(size: 18))
-                        .foregroundColor(appState.isLoggedIn ? prefs.accentPreset.color : Color(white: 0.9))
+                        .font(.system(size: 19))
+                        .foregroundColor(appState.isLoggedIn ? prefs.accentPreset.color : Color(white: 0.92))
                         .frame(width: 36, height: 36)
                         .contentShape(Rectangle())
                 }
@@ -205,11 +218,11 @@ struct DiscoverView: View {
         ZStack(alignment: .bottomLeading) {
             CachedAsyncImage(url: movie.displayThumbURL ?? movie.displayPosterURL)
                 .frame(maxWidth: .infinity)
-                .frame(height: 274)
+                .frame(height: 278)
                 .clipped()
 
             LinearGradient(
-                colors: [.clear, Color.black.opacity(0.3), Color.black.opacity(0.9)],
+                colors: [.clear, Color.black.opacity(0.28), Color.black.opacity(0.9)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -222,18 +235,18 @@ struct DiscoverView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.white.opacity(0.18))
+                            .background(prefs.accentPreset.color.opacity(0.85))
                             .cornerRadius(4)
                     }
                     if let lang = movie.lang, !lang.isEmpty {
                         Text(lang)
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color(white: 0.82))
+                            .foregroundColor(Color(white: 0.85))
                     }
                     if let year = movie.year?.value, year > 0 {
                         Text("• \(String(year))")
                             .font(.system(size: 10))
-                            .foregroundColor(Color(white: 0.65))
+                            .foregroundColor(Color(white: 0.68))
                     }
                 }
                 Text(movie.name)
@@ -243,24 +256,25 @@ struct DiscoverView: View {
                 if let orig = movie.origin_name, !orig.isEmpty {
                     Text(orig)
                         .font(.caption)
-                        .foregroundColor(Color(white: 0.65))
+                        .foregroundColor(Color(white: 0.7))
                         .lineLimit(1)
                 }
             }
             .padding(16)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.7)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6)
         )
+        .shadow(color: Color.black.opacity(0.4), radius: 14, x: 0, y: 8)
         .padding(.horizontal, 16)
     }
 
     private var continueWatchingRail: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Đang xem")
-                .font(.system(size: 17, weight: .semibold))
+            Text("Xem tiếp")
+                .font(.system(size: 19, weight: .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
 
@@ -285,39 +299,43 @@ struct DiscoverView: View {
                         )
                         NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: cardItem)) {
                             VStack(alignment: .leading, spacing: 5) {
-                                ZStack(alignment: .topLeading) {
-                                    ZStack(alignment: .bottom) {
-                                        CachedAsyncImage(url: item.displayPosterURL)
-                                            .frame(width: 156, height: 92)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                ZStack(alignment: .bottom) {
+                                    CachedAsyncImage(url: item.displayPosterURL)
+                                        .frame(width: 158, height: 94)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                                        )
 
-                                        ProgressView(value: item.progressRatio)
-                                            .tint(prefs.accentPreset.color)
-                                            .padding(6)
-                                    }
+                                    ProgressView(value: item.progressRatio)
+                                        .tint(prefs.accentPreset.color)
+                                        .padding(6)
+                                }
 
+                                HStack(alignment: .center, spacing: 4) {
+                                    Text(item.name ?? item.slug)
+                                        .font(.caption.weight(.medium))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 2)
                                     Menu {
                                         MovieContextMenuItems(movie: cardItem)
                                     } label: {
                                         Image(systemName: "ellipsis")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .frame(width: 24, height: 24)
-                                            .background(Color.black.opacity(0.65))
-                                            .clipShape(Circle())
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(Color(white: 0.65))
+                                            .frame(width: 22, height: 20)
+                                            .contentShape(Rectangle())
                                     }
-                                    .padding(6)
                                 }
-                                Text(item.name ?? item.slug)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
+
                                 Text(item.episodeName ?? "Xem tiếp")
                                     .font(.caption2)
-                                    .foregroundColor(Color(white: 0.52))
+                                    .foregroundColor(Color(white: 0.55))
                                     .lineLimit(1)
                             }
-                            .frame(width: 156)
+                            .frame(width: 158)
                         }
                         .buttonStyle(.plain)
                         .movieCardContextMenu(cardItem)
@@ -333,7 +351,7 @@ struct DiscoverView: View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 19, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
 
@@ -356,7 +374,7 @@ struct DiscoverView: View {
     private var latestGridSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Mới cập nhật")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 19, weight: .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
 
@@ -364,7 +382,7 @@ struct DiscoverView: View {
                 repeating: GridItem(.flexible(), spacing: 11),
                 count: UIDevice.current.userInterfaceIdiom == .pad ? 4 : prefs.gridColumnsPhone
             )
-            LazyVGrid(columns: cols, spacing: 14) {
+            LazyVGrid(columns: cols, spacing: 16) {
                 ForEach(visibleHero) { movie in
                     NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                         MoviePosterCard(movie: movie)

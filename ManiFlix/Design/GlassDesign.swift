@@ -3,30 +3,30 @@ import UIKit
 
 enum AccentPreset: String, CaseIterable, Identifiable {
     case crimson
+    case amber
     case sky
     case violet
     case emerald
-    case amber
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .crimson: return "Đỏ"
+        case .amber: return "Cam"
         case .sky: return "Xanh dương"
         case .violet: return "Tím"
-        case .emerald: return "Xanh ngọc"
-        case .amber: return "Vàng"
+        case .emerald: return "Xanh lá"
         }
     }
 
     var color: Color {
         switch self {
-        case .crimson: return Color(red: 0.88, green: 0.11, blue: 0.16)
-        case .sky: return Color(red: 0.22, green: 0.68, blue: 0.96)
-        case .violet: return Color(red: 0.62, green: 0.36, blue: 0.95)
-        case .emerald: return Color(red: 0.12, green: 0.74, blue: 0.53)
-        case .amber: return Color(red: 0.94, green: 0.63, blue: 0.12)
+        case .crimson: return Color(red: 0.98, green: 0.176, blue: 0.282) // Apple Music #FA2D48
+        case .amber: return Color(red: 1.0, green: 0.392, blue: 0.282)
+        case .sky: return Color(red: 0.039, green: 0.518, blue: 1.0)
+        case .violet: return Color(red: 0.369, green: 0.361, blue: 0.902)
+        case .emerald: return Color(red: 0.188, green: 0.820, blue: 0.345)
         }
     }
 }
@@ -40,9 +40,9 @@ enum GlassUIStyle: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .adaptive: return "Tự động theo hệ thống"
-        case .liquid: return "Liquid Glass (iOS 26+)"
-        case .legacy: return "Cổ điển (OLED tối giản)"
+        case .adaptive: return "Tự động"
+        case .liquid: return "Trong suốt"
+        case .legacy: return "Đơn giản"
         }
     }
 
@@ -61,11 +61,90 @@ enum GlassUIStyle: String, CaseIterable, Identifiable {
 
 enum ManiFlixTheme {
     static func background(oled: Bool) -> Color {
-        oled ? .black : Color(red: 0.055, green: 0.058, blue: 0.068)
+        oled ? .black : Color(red: 0.071, green: 0.071, blue: 0.078)
     }
 
     static func surface(oled: Bool) -> Color {
-        oled ? Color(white: 0.08) : Color(red: 0.09, green: 0.095, blue: 0.11)
+        oled ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.125, green: 0.125, blue: 0.141)
+    }
+}
+
+struct AmbientArtworkBackground: View {
+    let url: URL?
+    let oled: Bool
+    var height: CGFloat = 390
+    @ObservedObject private var prefs = AppPreferences.shared
+
+    var body: some View {
+        if prefs.ambientArtworkEnabled, let artworkURL = url {
+            ZStack(alignment: .top) {
+                CachedAsyncImage(url: artworkURL)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .blur(radius: 62)
+                    .saturation(1.28)
+                    .opacity(oled ? 0.34 : 0.44)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .white, location: 0.0),
+                                .init(color: .white.opacity(0.65), location: 0.52),
+                                .init(color: .clear, location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .ignoresSafeArea(edges: .top)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+}
+
+@available(iOS 16.0, *)
+struct WrappingFlowLayout: Layout {
+    var horizontalSpacing: CGFloat = 8
+    var verticalSpacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? 360
+        var curX: CGFloat = 0
+        var curY: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+            if curX > 0 && curX + size.width > maxWidth {
+                curX = 0
+                curY += rowHeight + verticalSpacing
+                rowHeight = 0
+            }
+            curX += size.width + horizontalSpacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: maxWidth, height: curY + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var curX = bounds.minX
+        var curY = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+            if curX > bounds.minX && curX + size.width > bounds.maxX + 0.5 {
+                curX = bounds.minX
+                curY += rowHeight + verticalSpacing
+                rowHeight = 0
+            }
+            subview.place(
+                at: CGPoint(x: curX, y: curY),
+                proposal: ProposedViewSize(width: min(size.width, bounds.width), height: size.height)
+            )
+            curX += size.width + horizontalSpacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 
@@ -80,7 +159,7 @@ struct AdaptiveGlassCardModifier: ViewModifier {
         if #available(iOS 26.0, *), prefs.glassStyle.shouldUseLiquidGlass {
             if let tint = tint {
                 content
-                    .glassEffect(.regular.tint(tint.opacity(0.22)).interactive(interactive), in: .rect(cornerRadius: cornerRadius))
+                    .glassEffect(.regular.tint(tint.opacity(0.28)).interactive(interactive), in: .rect(cornerRadius: cornerRadius))
             } else {
                 content
                     .glassEffect(.regular.interactive(interactive), in: .rect(cornerRadius: cornerRadius))
@@ -98,7 +177,7 @@ struct AdaptiveGlassCardModifier: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(tint != nil ? tint!.opacity(0.18) : Color.white.opacity(0.06))
+                    .fill(tint != nil ? tint!.opacity(0.20) : Color.white.opacity(0.07))
                     .background(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(.ultraThinMaterial)
@@ -106,7 +185,7 @@ struct AdaptiveGlassCardModifier: ViewModifier {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(tint != nil ? 0.22 : 0.09), lineWidth: 0.6)
+                    .strokeBorder(Color.white.opacity(tint != nil ? 0.25 : 0.08), lineWidth: 0.6)
             )
     }
 }
@@ -121,7 +200,7 @@ struct AdaptiveGlassCapsuleModifier: ViewModifier {
         if #available(iOS 26.0, *), prefs.glassStyle.shouldUseLiquidGlass {
             if let tint = tint {
                 content
-                    .glassEffect(.regular.tint(tint.opacity(0.28)).interactive(interactive), in: .capsule)
+                    .glassEffect(.regular.tint(tint.opacity(0.32)).interactive(interactive), in: .capsule)
             } else {
                 content
                     .glassEffect(.regular.interactive(interactive), in: .capsule)
@@ -139,7 +218,7 @@ struct AdaptiveGlassCapsuleModifier: ViewModifier {
         content
             .background(
                 Capsule()
-                    .fill(tint != nil ? tint!.opacity(0.85) : Color.white.opacity(0.08))
+                    .fill(tint != nil ? tint!.opacity(0.88) : Color.white.opacity(0.09))
                     .background(
                         Capsule().fill(.ultraThinMaterial)
                     )
@@ -158,6 +237,15 @@ extension View {
 
     func adaptiveGlassCapsule(interactive: Bool = true, tint: Color? = nil) -> some View {
         modifier(AdaptiveGlassCapsuleModifier(interactive: interactive, tint: tint))
+    }
+
+    @ViewBuilder
+    func adaptiveHiddenScrollBackground() -> some View {
+        if #available(iOS 16.0, *) {
+            self.scrollContentBackground(.hidden)
+        } else {
+            self
+        }
     }
 
     @ViewBuilder

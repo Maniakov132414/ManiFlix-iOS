@@ -38,6 +38,7 @@ final class AppState: ObservableObject {
 
     private let blockedKey = "prefs.blockedMovies.v1"
     private let likedKey = "prefs.likedSlugs.v1"
+    private let localHistoryKey = "prefs.localHistory.v1"
 
     private init() {
         self.authToken = UserDefaults.standard.string(forKey: "auth.token") ?? ""
@@ -47,6 +48,10 @@ final class AppState: ObservableObject {
         }
         if let savedLikes = UserDefaults.standard.stringArray(forKey: likedKey) {
             self.likedSlugs = Set(savedLikes)
+        }
+        if let hData = UserDefaults.standard.data(forKey: localHistoryKey),
+           let decodedHist = try? JSONDecoder().decode([HistoryEntry].self, from: hData) {
+            self.history = decodedHist
         }
     }
 
@@ -71,7 +76,10 @@ final class AppState: ObservableObject {
         guard !authToken.isEmpty else { return }
         async let histTask = ManiFlixAPI.shared.fetchHistory(token: authToken)
         async let favTask = ManiFlixAPI.shared.fetchFavorites(token: authToken)
-        if let h = try? await histTask { self.history = h.history ?? [] }
+        if let h = try? await histTask, let serverHist = h.history {
+            self.history = serverHist
+            persistLocalHistory()
+        }
         if let f = try? await favTask { self.favorites = f.favorites ?? [] }
     }
 
@@ -86,7 +94,6 @@ final class AppState: ObservableObject {
         authToken = ""
         currentUser = nil
         favorites = []
-        history = []
     }
 
     func isFavorite(slug: String) -> Bool {
@@ -166,12 +173,39 @@ final class AppState: ObservableObject {
         blockedMovies.removeAll(where: { $0.slug == slug })
         persistBlocked()
         Haptics.impact(.light)
+        showBanner("Đã bỏ ẩn phim")
     }
 
     private func persistBlocked() {
         if let data = try? JSONEncoder().encode(blockedMovies) {
             UserDefaults.standard.set(data, forKey: blockedKey)
         }
+    }
+
+    private func persistLocalHistory() {
+        if let data = try? JSONEncoder().encode(history) {
+            UserDefaults.standard.set(data, forKey: localHistoryKey)
+        }
+    }
+
+    static func presentShareSheet(items: [Any]) {
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController ?? scene.windows.first?.rootViewController else {
+            return
+        }
+        var top = root
+        while let next = top.presentedViewController {
+            top = next
+        }
+        if let pop = vc.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 1, height: 1)
+            pop.permittedArrowDirections = []
+        }
+        top.present(vc, animated: true)
     }
 
     func showBanner(_ text: String) {
@@ -226,6 +260,7 @@ final class AppState: ObservableObject {
         )
         history.removeAll(where: { $0.slug == movie.slug })
         history.insert(localEntry, at: 0)
+        persistLocalHistory()
 
         guard !authToken.isEmpty else { return }
         await ManiFlixAPI.shared.saveHistory(
@@ -242,6 +277,7 @@ final class AppState: ObservableObject {
 
     func deleteHistory(slug: String) async {
         history.removeAll(where: { $0.slug == slug })
+        persistLocalHistory()
         guard !authToken.isEmpty else { return }
         await ManiFlixAPI.shared.deleteHistory(token: authToken, slug: slug)
         showBanner("Đã xoá khỏi lịch sử xem")
@@ -251,12 +287,7 @@ final class AppState: ObservableObject {
         let ep = servers[safe: serverIndex]?.server_data[safe: episodeIndex]
         let prefs = AppPreferences.shared
         if prefs.externalPlayer != .internalPlayer, let ep = ep, let m3u8 = ep.link_m3u8, !m3u8.isEmpty {
-            let targetURL: String
-            if prefs.preferredSource == .cleanFirst, let clean = ManiFlixAPI.shared.cleanM3U8URL(from: m3u8)?.absoluteString {
-                targetURL = clean
-            } else {
-                targetURL = m3u8
-            }
+            let targetURL = ManiFlixAPI.shared.cleanM3U8URL(from: m3u8)?.absoluteString ?? m3u8
             if ExternalPlayerLauncher.open(url: targetURL, option: prefs.externalPlayer) {
                 return
             }

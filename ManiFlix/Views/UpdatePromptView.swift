@@ -66,7 +66,7 @@ struct UpdatePromptView: View {
                                             Text(variant.name)
                                                 .font(.caption.weight(.medium))
                                                 .foregroundColor(.white)
-                                            Text("iOS \(variant.minOS ?? "15.0")+ • \(variant.hasPlugins == false ? "No Plugins" : "Kèm Widget")")
+                                            Text("Hỗ trợ iOS \(variant.minOS ?? "15.0") trở lên\(variant.hasPlugins == true ? " • Kèm Widget" : "")")
                                                 .font(.caption2)
                                                 .foregroundColor(.secondary)
                                         }

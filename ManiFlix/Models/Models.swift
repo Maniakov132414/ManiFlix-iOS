@@ -194,6 +194,7 @@ struct FranchiseSeason: Codable, Identifiable, Hashable {
     let name: String?
     let isRecap: Bool?
     let fullTitle: String?
+    let originName: String?
     let slug: String
     let year: FlexibleInt?
     let seasonNumber: FlexibleInt?
@@ -201,6 +202,13 @@ struct FranchiseSeason: Codable, Identifiable, Hashable {
     let quality: String?
     let lang: String?
     let episodeCurrent: String?
+
+    var displayFullTitle: String {
+        let full = (fullTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !full.isEmpty { return full }
+        let short = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return short.isEmpty ? slug : short
+    }
 }
 
 struct AdsResponse: Codable {

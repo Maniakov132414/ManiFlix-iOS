@@ -6,16 +6,32 @@ import MediaPlayer
 enum OrientationController {
     static var allowedMask: UIInterfaceOrientationMask = .portrait
 
-    static func setLandscape(_ landscape: Bool) {
-        allowedMask = landscape ? .landscape : .allButUpsideDown
+    private static func notifyAllControllers(in windowScene: UIWindowScene) {
+        for window in windowScene.windows {
+            var vc = window.rootViewController
+            while let current = vc {
+                current.setNeedsUpdateOfSupportedInterfaceOrientations()
+                vc = current.presentedViewController
+            }
+        }
+    }
+
+    static func setPlayerLandscape(_ landscape: Bool) {
+        allowedMask = landscape ? .landscape : .portrait
         let targetMask: UIInterfaceOrientationMask = landscape ? .landscapeRight : .portrait
 
         if #available(iOS 16.0, *) {
             for scene in UIApplication.shared.connectedScenes {
-                if let windowScene = scene as? UIWindowScene {
-                    windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: targetMask)) { _ in }
-                    windowScene.windows.forEach { $0.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations() }
+                guard let windowScene = scene as? UIWindowScene else { continue }
+                notifyAllControllers(in: windowScene)
+                windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: targetMask)) { _ in }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                for scene in UIApplication.shared.connectedScenes {
+                    guard let windowScene = scene as? UIWindowScene else { continue }
+                    notifyAllControllers(in: windowScene)
                 }
+                UIViewController.attemptRotationToDeviceOrientation()
             }
         } else {
             let orient: UIInterfaceOrientation = landscape ? .landscapeRight : .portrait
@@ -24,20 +40,24 @@ enum OrientationController {
         }
     }
 
-    static func allowFreeRotation() {
-        allowedMask = .allButUpsideDown
-        if #available(iOS 16.0, *) {
-            for scene in UIApplication.shared.connectedScenes {
-                if let windowScene = scene as? UIWindowScene {
-                    windowScene.windows.forEach { $0.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations() }
+    static func forcePortrait() {
+        setPlayerLandscape(false)
+        for delay in [0.15, 0.35] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard !AppState.shared.isPlayerPresented else { return }
+                allowedMask = .portrait
+                if #available(iOS 16.0, *) {
+                    for scene in UIApplication.shared.connectedScenes {
+                        guard let windowScene = scene as? UIWindowScene else { continue }
+                        notifyAllControllers(in: windowScene)
+                        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+                    }
+                } else {
+                    UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
                 }
+                UIViewController.attemptRotationToDeviceOrientation()
             }
         }
-    }
-
-    static func resetPortrait() {
-        setLandscape(false)
-        allowedMask = .portrait
     }
 }
 
@@ -140,7 +160,14 @@ struct ManiFlixPlayerView: View {
                 .ignoresSafeArea(edges: engine.aspectMode == .edgeFill ? .all : [])
 
             GeometryReader { geo in
+                let actualLandscape = geo.size.width > geo.size.height
                 gestureLayer(in: geo.size)
+                    .onAppear {
+                        isLandscape = actualLandscape
+                    }
+                    .onChange(of: actualLandscape) { newVal in
+                        isLandscape = newVal
+                    }
             }
 
             centerStatusOverlay
@@ -292,15 +319,13 @@ struct ManiFlixPlayerView: View {
         .onAppear {
             engine.closingExplicitly = false
             engine.syncAutoPiPPreference()
-            OrientationController.allowFreeRotation()
-            if prefs.autoRotateLandscape {
-                isLandscape = true
-                OrientationController.setLandscape(true)
-            }
+            let wantLandscape = prefs.autoRotateLandscape
+            isLandscape = wantLandscape
+            OrientationController.setPlayerLandscape(wantLandscape)
             scheduleAutoHide()
         }
         .onDisappear {
-            OrientationController.resetPortrait()
+            OrientationController.forcePortrait()
         }
         .sheet(isPresented: $showEpisodeDrawer) {
             episodeDrawerSheet
@@ -324,6 +349,7 @@ struct ManiFlixPlayerView: View {
     }
 
     private func closePlayerTapped() {
+        OrientationController.forcePortrait()
         engine.markClosingExplicitly()
         appState.isPlayerPresented = false
         dismiss()
@@ -508,7 +534,7 @@ struct ManiFlixPlayerView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
-                    Text("\(engine.currentEpisode?.name ?? "Tập 1") • \(engine.currentSourceLabel)")
+                    Text(engine.currentEpisode?.name ?? "Tập 1")
                         .font(.caption2)
                         .foregroundColor(Color(white: 0.7))
                         .lineLimit(1)
@@ -538,6 +564,7 @@ struct ManiFlixPlayerView: View {
                 if AVPictureInPictureController.isPictureInPictureSupported() {
                     Button {
                         if !engine.isPiPActive {
+                            OrientationController.forcePortrait()
                             engine.togglePiP()
                             Task {
                                 try? await Task.sleep(nanoseconds: 250_000_000)
@@ -717,8 +744,9 @@ struct ManiFlixPlayerView: View {
                     .adaptiveGlassCapsule()
 
                     Button {
-                        isLandscape.toggle()
-                        OrientationController.setLandscape(isLandscape)
+                        let nextLandscape = !isLandscape
+                        isLandscape = nextLandscape
+                        OrientationController.setPlayerLandscape(nextLandscape)
                         scheduleAutoHide()
                         Haptics.impact(.light)
                     } label: {
