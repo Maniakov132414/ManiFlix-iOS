@@ -174,7 +174,12 @@ final class AppPreferences: ObservableObject {
     }
 
     private init() {
-        self.glassStyle = GlassUIStyle(rawValue: defaults.string(forKey: "pref.glassStyle") ?? "") ?? .adaptive
+        #if LEGACY_UI_DEFAULT
+        let defaultGlass: GlassUIStyle = .legacy
+        #else
+        let defaultGlass: GlassUIStyle = .adaptive
+        #endif
+        self.glassStyle = GlassUIStyle(rawValue: defaults.string(forKey: "pref.glassStyle") ?? "") ?? defaultGlass
         self.oledBlackEnabled = defaults.object(forKey: "pref.oledBlack") as? Bool ?? true
         self.accentPreset = AccentPreset(rawValue: defaults.string(forKey: "pref.accentPreset") ?? "") ?? .crimson
         let cols = defaults.integer(forKey: "pref.gridColumnsPhone")

@@ -17,23 +17,22 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>2</string>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
+		<key>UISceneConfigurations</key>
+		<dict/>
 	</dict>
 	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIColorName</key>
-		<string></string>
-		<key>UIImageName</key>
-		<string></string>
-	</dict>
+	<dict/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -58,6 +57,8 @@
 	</dict>
 	<key>NSMotionUsageDescription</key>
 	<string>ManiFlix sử dụng cảm biến chuyển động tai nghe (Head Tracking) để tối ưu trải nghiệm Spatial Audio.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>ManiFlix cần quyền mạng nội bộ để kết nối phát AirPlay và nguồn phim.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -72,10 +73,13 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>vlc</string>
+		<string>vlc-x-callback</string>
 		<string>outplayer</string>
 		<string>infuse</string>
 		<string>sidestore</string>
 		<string>altstore</string>
+		<string>esign</string>
+		<string>feather</string>
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>

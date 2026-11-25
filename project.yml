@@ -9,7 +9,9 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
+    GENERATE_INFOPLIST_FILE: "NO"
+    APP_BUNDLE_ID: "bond.maniakov.maniflix"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_IDENTITY: ""
     CODE_SIGNING_REQUIRED: "NO"
@@ -27,14 +29,14 @@ targets:
       - path: ManiFlix
         excludes:
           - "**/*.md"
-    info:
-      path: ManiFlix/Info.plist
+          - "Info.plist"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: bond.maniakov.maniflix
+        PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID)"
         PRODUCT_NAME: ManiFlix
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
+        GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: ManiFlix/Info.plist
         LD_RUNPATH_SEARCH_PATHS:
           - "$(inherited)"
@@ -48,14 +50,15 @@ targets:
     platform: iOS
     sources:
       - path: ManiFlixWidgets
-    info:
-      path: ManiFlixWidgets/Info.plist
+        excludes:
+          - "Info.plist"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: bond.maniakov.maniflix.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID).widgets"
         PRODUCT_NAME: ManiFlixWidgets
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
+        GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: ManiFlixWidgets/Info.plist
         SKIP_INSTALL: "YES"
         LD_RUNPATH_SEARCH_PATHS:

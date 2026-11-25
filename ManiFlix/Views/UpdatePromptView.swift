@@ -1,10 +1,16 @@
 import SwiftUI
+import UIKit
 
 struct UpdatePromptView: View {
     let isForced: Bool
     @ObservedObject private var updates = UpdateManager.shared
     @ObservedObject private var prefs = AppPreferences.shared
     @Environment(\.openURL) private var openURL
+    @State private var copiedRepo = false
+
+    private var repoURLString: String {
+        updates.config?.altStoreSourceUrl ?? "https://phim.maniakov.bond/repo.json"
+    }
 
     var body: some View {
         NavigationView {
@@ -76,31 +82,59 @@ struct UpdatePromptView: View {
                         }
                     }
 
-                    HStack(spacing: 10) {
-                        Button {
-                            let src = updates.config?.altStoreSourceUrl ?? "https://raw.githubusercontent.com/Maniakov132414/ManiFlix-iOS/main/altsource/source.json"
-                            if let url = URL(string: "sidestore://source?url=\(src)") {
-                                openURL(url)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Link Repo (ESign / Feather / SideStore)")
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Button(copiedRepo ? "Đã chép" : "Chép link") {
+                                UIPasteboard.general.string = repoURLString
+                                copiedRepo = true
+                                Haptics.notify(.success)
                             }
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(prefs.accentPreset.color)
+                        }
+                        Text(repoURLString)
+                            .font(.caption2.monospaced())
+                            .foregroundColor(Color(white: 0.75))
+                            .lineLimit(1)
+                    }
+                    .padding(12)
+                    .adaptiveGlassCard(cornerRadius: 10)
+
+                    HStack(spacing: 8) {
+                        Button {
+                            if let url = URL(string: "sidestore://source?url=\(repoURLString)") { openURL(url) }
                         } label: {
-                            Text("Mở trong SideStore")
+                            Text("SideStore")
                                 .font(.caption.weight(.medium))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 38)
+                                .frame(height: 36)
                         }
                         .adaptiveGlassCapsule()
 
                         Button {
-                            if let url = URL(string: updates.config?.releasePageUrl ?? "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest") {
-                                openURL(url)
-                            }
+                            if let url = URL(string: "esign://addsource?url=\(repoURLString)") { openURL(url) }
                         } label: {
-                            Text("Trang phát hành")
+                            Text("ESign")
                                 .font(.caption.weight(.medium))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 38)
+                                .frame(height: 36)
+                        }
+                        .adaptiveGlassCapsule()
+
+                        Button {
+                            if let url = URL(string: "feather://source/\(repoURLString)") { openURL(url) }
+                        } label: {
+                            Text("Feather")
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 36)
                         }
                         .adaptiveGlassCapsule()
                     }

@@ -36,83 +36,156 @@ jobs:
           sips -s format png -z 1024 1024 /tmp/appicon.bmp --out "$ICON_SRC"
           sips -g pixelWidth -g pixelHeight -g hasAlpha "$ICON_SRC"
 
-      - name: Generate Xcode Project
+      - name: Generate Xcode Project & Assert Info.plist Integrity
         run: |
           xcodegen generate
+          python3 -c "
+          import plistlib
+          app_pl = plistlib.loads(open('ManiFlix/Info.plist', 'rb').read())
+          wid_pl = plistlib.loads(open('ManiFlixWidgets/Info.plist', 'rb').read())
+          assert app_pl.get('CFBundleShortVersionString') == '1.0.0', app_pl
+          assert app_pl.get('LSRequiresIPhoneOS') is True, app_pl
+          assert wid_pl.get('NSExtension', {}).get('NSExtensionPointIdentifier') == 'com.apple.widgetkit-extension', wid_pl
+          print('Info.plist integrity verified before archive!')
+          "
 
       - name: Prepare Output Directory
         run: mkdir -p dist
 
-      - name: Build Variant Pair - iOS 15+ (Legacy + Adaptive)
+      - name: Build Modern Pair (iOS 17–26+ Adaptive Liquid Glass)
         run: |
+          # NoPlugins (bond.maniakov.maniflix)
           xcodebuild archive \
             -project ManiFlix.xcodeproj \
             -scheme ManiFlix \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath /tmp/ManiFlix-iOS15.xcarchive \
+            -derivedDataPath /tmp/dd-modern \
+            -archivePath /tmp/ManiFlix-Modern-NoPlug.xcarchive \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
+            APP_BUNDLE_ID=bond.maniakov.maniflix \
+            MARKETING_VERSION=1.0.0 \
+            CURRENT_PROJECT_VERSION=2 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+          rm -rf /tmp/pkg-mod-noplug && mkdir -p /tmp/pkg-mod-noplug/Payload
+          cp -R /tmp/ManiFlix-Modern-NoPlug.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-mod-noplug/Payload/ManiFlix.app
+          rm -rf /tmp/pkg-mod-noplug/Payload/ManiFlix.app/PlugIns
+          rm -rf /tmp/pkg-mod-noplug/Payload/ManiFlix.app/_CodeSignature
+          chmod +x /tmp/pkg-mod-noplug/Payload/ManiFlix.app/ManiFlix
+          (cd /tmp/pkg-mod-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa" Payload)
+          cp "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa" "$GITHUB_WORKSPACE/dist/ManiFlix.ipa"
+
+          # Full + Widget (bond.maniakov.maniflix.full)
+          xcodebuild archive \
+            -project ManiFlix.xcodeproj \
+            -scheme ManiFlix \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath /tmp/dd-modern \
+            -archivePath /tmp/ManiFlix-Modern-Full.xcarchive \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
+            APP_BUNDLE_ID=bond.maniakov.maniflix.full \
+            MARKETING_VERSION=1.0.0 \
+            CURRENT_PROJECT_VERSION=2 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+          rm -rf /tmp/pkg-mod-full && mkdir -p /tmp/pkg-mod-full/Payload
+          cp -R /tmp/ManiFlix-Modern-Full.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-mod-full/Payload/ManiFlix.app
+          rm -rf /tmp/pkg-mod-full/Payload/ManiFlix.app/_CodeSignature
+          rm -rf /tmp/pkg-mod-full/Payload/ManiFlix.app/PlugIns/*/_CodeSignature
+          chmod +x /tmp/pkg-mod-full/Payload/ManiFlix.app/ManiFlix
+          chmod +x /tmp/pkg-mod-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/ManiFlixWidgets
+          (cd /tmp/pkg-mod-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-Full.ipa" Payload)
+
+      - name: Build Legacy Pair (iOS 15–18+ OLED Default)
+        run: |
+          # NoPlugins (bond.maniakov.maniflix.legacy)
+          xcodebuild archive \
+            -project ManiFlix.xcodeproj \
+            -scheme ManiFlix \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath /tmp/dd-legacy \
+            -archivePath /tmp/ManiFlix-Legacy-NoPlug.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
+            APP_BUNDLE_ID=bond.maniakov.maniflix.legacy \
             MARKETING_VERSION=1.0.0 \
-            CURRENT_PROJECT_VERSION=1 \
+            CURRENT_PROJECT_VERSION=2 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # Full variant (includes WidgetKit PlugIn)
-          rm -rf /tmp/pkg-15-full && mkdir -p /tmp/pkg-15-full/Payload
-          cp -R /tmp/ManiFlix-iOS15.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-15-full/Payload/ManiFlix.app
-          codesign --force --sign - /tmp/pkg-15-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex || true
-          codesign --force --sign - /tmp/pkg-15-full/Payload/ManiFlix.app
-          (cd /tmp/pkg-15-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-Full.ipa" Payload)
+          rm -rf /tmp/pkg-leg-noplug && mkdir -p /tmp/pkg-leg-noplug/Payload
+          cp -R /tmp/ManiFlix-Legacy-NoPlug.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-leg-noplug/Payload/ManiFlix.app
+          rm -rf /tmp/pkg-leg-noplug/Payload/ManiFlix.app/PlugIns
+          rm -rf /tmp/pkg-leg-noplug/Payload/ManiFlix.app/_CodeSignature
+          chmod +x /tmp/pkg-leg-noplug/Payload/ManiFlix.app/ManiFlix
+          (cd /tmp/pkg-leg-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-NoPlugins.ipa" Payload)
 
-          # NoPlugins variant (PlugIns stripped for 1-App-ID sideloading)
-          rm -rf /tmp/pkg-15-noplug && mkdir -p /tmp/pkg-15-noplug/Payload
-          cp -R /tmp/ManiFlix-iOS15.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-15-noplug/Payload/ManiFlix.app
-          rm -rf /tmp/pkg-15-noplug/Payload/ManiFlix.app/PlugIns
-          codesign --force --sign - /tmp/pkg-15-noplug/Payload/ManiFlix.app
-          (cd /tmp/pkg-15-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-NoPlugins.ipa" Payload)
-
-          # Universal default ManiFlix.ipa alias (maximum iOS compatibility + 1 App ID)
-          cp "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-NoPlugins.ipa" "$GITHUB_WORKSPACE/dist/ManiFlix.ipa"
-
-      - name: Build Variant Pair - iOS 26+ (Pure Liquid Glass)
-        run: |
+          # Full + Widget (bond.maniakov.maniflix.legacy.full)
           xcodebuild archive \
             -project ManiFlix.xcodeproj \
             -scheme ManiFlix \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath /tmp/ManiFlix-iOS26.xcarchive \
-            IPHONEOS_DEPLOYMENT_TARGET=26.0 \
+            -derivedDataPath /tmp/dd-legacy \
+            -archivePath /tmp/ManiFlix-Legacy-Full.xcarchive \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
+            APP_BUNDLE_ID=bond.maniakov.maniflix.legacy.full \
             MARKETING_VERSION=1.0.0 \
-            CURRENT_PROJECT_VERSION=1 \
+            CURRENT_PROJECT_VERSION=2 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # Full variant (includes WidgetKit PlugIn)
-          rm -rf /tmp/pkg-26-full && mkdir -p /tmp/pkg-26-full/Payload
-          cp -R /tmp/ManiFlix-iOS26.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-26-full/Payload/ManiFlix.app
-          codesign --force --sign - /tmp/pkg-26-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex || true
-          codesign --force --sign - /tmp/pkg-26-full/Payload/ManiFlix.app
-          (cd /tmp/pkg-26-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-Full.ipa" Payload)
+          rm -rf /tmp/pkg-leg-full && mkdir -p /tmp/pkg-leg-full/Payload
+          cp -R /tmp/ManiFlix-Legacy-Full.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-leg-full/Payload/ManiFlix.app
+          rm -rf /tmp/pkg-leg-full/Payload/ManiFlix.app/_CodeSignature
+          rm -rf /tmp/pkg-leg-full/Payload/ManiFlix.app/PlugIns/*/_CodeSignature
+          chmod +x /tmp/pkg-leg-full/Payload/ManiFlix.app/ManiFlix
+          chmod +x /tmp/pkg-leg-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/ManiFlixWidgets
+          (cd /tmp/pkg-leg-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-Full.ipa" Payload)
 
-          # NoPlugins variant (PlugIns stripped for 1-App-ID sideloading)
-          rm -rf /tmp/pkg-26-noplug && mkdir -p /tmp/pkg-26-noplug/Payload
-          cp -R /tmp/ManiFlix-iOS26.xcarchive/Products/Applications/ManiFlix.app /tmp/pkg-26-noplug/Payload/ManiFlix.app
-          rm -rf /tmp/pkg-26-noplug/Payload/ManiFlix.app/PlugIns
-          codesign --force --sign - /tmp/pkg-26-noplug/Payload/ManiFlix.app
-          (cd /tmp/pkg-26-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa" Payload)
-
-      - name: Verify All 5 IPA Archives
+      - name: Strict Python Validation of All 5 IPA Archives
         run: |
-          ls -lh dist/
-          for f in dist/*.ipa; do
-            echo "=== Checking $f ==="
-            unzip -l "$f" | grep -E "Payload/ManiFlix.app/(ManiFlix$|Info.plist|PlugIns)" || true
-          done
+          python3 - <<'PY'
+          import zipfile, plistlib, glob, os
+
+          files = sorted(glob.glob("dist/*.ipa"))
+          assert len(files) == 5, f"Expected 5 IPAs, found {files}"
+          for path in files:
+              name = os.path.basename(path)
+              with zipfile.ZipFile(path) as zf:
+                  names = zf.namelist()
+                  assert not any("_CodeSignature" in n for n in names), f"{name}: found stale _CodeSignature"
+                  pl = plistlib.loads(zf.read("Payload/ManiFlix.app/Info.plist"))
+                  assert pl.get("CFBundleShortVersionString") == "1.0.0", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
+                  assert pl.get("CFBundleVersion") == "2", f"{name}: wrong build {pl.get('CFBundleVersion')}"
+                  assert pl.get("LSRequiresIPhoneOS") is True, f"{name}: missing LSRequiresIPhoneOS"
+                  assert "UILaunchScreen" in pl, f"{name}: missing UILaunchScreen"
+                  exe_info = zf.getinfo("Payload/ManiFlix.app/ManiFlix")
+                  assert ((exe_info.external_attr >> 16) & 0o111) != 0, f"{name}: binary not executable"
+
+                  if "NoPlugins" in name or name == "ManiFlix.ipa":
+                      assert not any("/PlugIns/" in n for n in names), f"{name}: unexpected PlugIns"
+                  else:
+                      wpl = plistlib.loads(zf.read("Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/Info.plist"))
+                      assert wpl.get("CFBundleShortVersionString") == "1.0.0", f"{name}: wrong widget version"
+                      assert wpl.get("NSExtension", {}).get("NSExtensionPointIdentifier") == "com.apple.widgetkit-extension", f"{name}: widget missing NSExtension"
+
+                  print(f"OK {name}: bid={pl.get('CFBundleIdentifier')} ver={pl.get('CFBundleShortVersionString')} ({pl.get('CFBundleVersion')}) minOS={pl.get('MinimumOSVersion')} size={os.path.getsize(path)}")
+          PY
 
       - name: Upload Workflow Artifacts
         uses: actions/upload-artifact@v4
@@ -127,12 +200,12 @@ jobs:
           tag_name: v1.0.0
           name: ManiFlix iOS v1.0.0 (Liquid Glass & Legacy)
           body: |
-            ## ManiFlix Native iOS v1.0.0
-            - **ManiFlix-iOS26-LiquidGlass-Full.ipa**: Dành cho iOS 26+ (Pure Liquid Glass + Widget Home Screen).
-            - **ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa**: Dành cho iOS 26+ (Pure Liquid Glass, đã gỡ PlugIns để tiết kiệm App ID khi cài AltStore/SideStore miễn phí).
-            - **ManiFlix-iOS15-Legacy-Full.ipa**: Dành cho iOS 15 – 18+ (Adaptive Blur/OLED + Liquid Glass khi chạy trên iOS 26 + Widget Home Screen).
-            - **ManiFlix-iOS15-Legacy-NoPlugins.ipa**: Dành cho iOS 15 – 18+ (Adaptive Blur/OLED, đã gỡ PlugIns cho AltStore/SideStore free account).
-            - **ManiFlix.ipa**: Bản chuẩn tương thích rộng nhất (iOS 15–26+, No Plugins).
+            ## ManiFlix Native iOS v1.0.0 (Build 2)
+            - **Link Repo cho ESign / Feather / SideStore / AltStore**: `https://phim.maniakov.bond/repo.json`
+            - **ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa** (`iOS 17–26+`): Native Liquid Glass trên iOS 26+, chạy mượt iOS 17–18, tối ưu ký 1 App ID cho ESign/SideStore/AltStore.
+            - **ManiFlix-iOS26-LiquidGlass-Full.ipa** (`iOS 17–26+`): Kèm Widget màn hình chính.
+            - **ManiFlix-iOS15-Legacy-NoPlugins.ipa** (`iOS 15+`): Giao diện OLED tối giản cổ điển, không PlugIns.
+            - **ManiFlix-iOS15-Legacy-Full.ipa** (`iOS 15+`): Giao diện OLED cổ điển kèm Widget.
           files: dist/*.ipa
           overwrite_files: true
           make_latest: true
