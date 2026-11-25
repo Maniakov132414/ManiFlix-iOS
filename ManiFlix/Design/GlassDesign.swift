@@ -462,11 +462,11 @@ final class ImageCacheStore {
         "\(url.absoluteString)#\(Int(maxPixelSize))" as NSString
     }
 
-    func image(for url: URL, maxPixelSize: CGFloat) -> UIImage? {
+    func image(for url: URL, maxPixelSize: CGFloat = 360) -> UIImage? {
         cache.object(forKey: cacheKey(for: url, maxPixelSize: maxPixelSize))
     }
 
-    func store(_ image: UIImage, for url: URL, maxPixelSize: CGFloat) {
+    func store(_ image: UIImage, for url: URL, maxPixelSize: CGFloat = 360) {
         let pixelW = Int(image.size.width * image.scale)
         let pixelH = Int(image.size.height * image.scale)
         let cost = max(1, pixelW * pixelH * 4)
