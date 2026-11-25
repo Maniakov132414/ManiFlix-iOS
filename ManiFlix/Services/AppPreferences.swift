@@ -262,64 +262,62 @@ final class AppPreferences: ObservableObject {
     }
 
     private init() {
+        let ud = UserDefaults.standard
         #if LEGACY_UI_DEFAULT
         let defaultGlass: GlassUIStyle = .legacy
-        let defaultOled = true
         let defaultThemeMode: ThemeMode = .oled
         #else
         let defaultGlass: GlassUIStyle = .adaptive
-        let defaultOled = false
         let defaultThemeMode: ThemeMode = .system
         #endif
 
-        let resolvedMode: ThemeMode = {
-            if let savedMode = defaults.string(forKey: "pref.themeMode"),
-               let parsed = ThemeMode(rawValue: savedMode) {
-                return parsed
-            }
-            if defaults.object(forKey: "pref.oledBlack") != nil {
-                return defaults.bool(forKey: "pref.oledBlack") ? .oled : .dark
-            }
-            return defaultThemeMode
-        }()
+        let resolvedMode: ThemeMode
+        if let savedMode = ud.string(forKey: "pref.themeMode"),
+           let parsed = ThemeMode(rawValue: savedMode) {
+            resolvedMode = parsed
+        } else if ud.object(forKey: "pref.oledBlack") != nil {
+            resolvedMode = ud.bool(forKey: "pref.oledBlack") ? .oled : .dark
+        } else {
+            resolvedMode = defaultThemeMode
+        }
 
-        let savedAccentPreset = AccentPreset(rawValue: defaults.string(forKey: "pref.accentPreset") ?? "") ?? .crimson
-        let savedAccentHex = defaults.string(forKey: "pref.customAccentHex") ?? savedAccentPreset.hexString
-        let savedBgHex = defaults.string(forKey: "pref.customBgHex") ?? "#121214"
-        let savedSurfaceHex = defaults.string(forKey: "pref.customSurfaceHex") ?? "#1C1C1E"
-        let savedPresetId = defaults.string(forKey: "pref.activeThemePresetId") ?? (resolvedMode == .oled ? "oled" : "apple-dark")
+        let savedAccentPreset = AccentPreset(rawValue: ud.string(forKey: "pref.accentPreset") ?? "") ?? .crimson
+        let savedAccentHex = ud.string(forKey: "pref.customAccentHex") ?? savedAccentPreset.hexString
+        let savedBgHex = ud.string(forKey: "pref.customBgHex") ?? "#121214"
+        let savedSurfaceHex = ud.string(forKey: "pref.customSurfaceHex") ?? "#1C1C1E"
+        let savedPresetId = ud.string(forKey: "pref.activeThemePresetId") ?? (resolvedMode == .oled ? "oled" : (resolvedMode == .system ? "system" : "apple-dark"))
 
-        self.glassStyle = GlassUIStyle(rawValue: defaults.string(forKey: "pref.glassStyle") ?? "") ?? defaultGlass
+        self.glassStyle = GlassUIStyle(rawValue: ud.string(forKey: "pref.glassStyle") ?? "") ?? defaultGlass
         self.themeMode = resolvedMode
-        self.oledBlackEnabled = (resolvedMode == .oled) || (defaults.object(forKey: "pref.oledBlack") as? Bool ?? defaultOled && resolvedMode == .oled)
+        self.oledBlackEnabled = (resolvedMode == .oled)
         self.customAccentHex = savedAccentHex
         self.customBgHex = savedBgHex
         self.customSurfaceHex = savedSurfaceHex
         self.activeThemePresetId = savedPresetId
-        self.ambientArtworkEnabled = defaults.object(forKey: "pref.ambientArtwork") as? Bool ?? true
+        self.ambientArtworkEnabled = ud.object(forKey: "pref.ambientArtwork") as? Bool ?? true
         self.accentPreset = AccentPreset.allCases.first(where: { $0.hexString.caseInsensitiveCompare(savedAccentHex) == .orderedSame }) ?? savedAccentPreset
-        let cols = defaults.integer(forKey: "pref.gridColumnsPhone")
+        let cols = ud.integer(forKey: "pref.gridColumnsPhone")
         self.gridColumnsPhone = (cols == 2 || cols == 3) ? cols : 3
-        self.hapticsEnabled = defaults.object(forKey: "pref.hapticsEnabled") as? Bool ?? true
+        self.hapticsEnabled = ud.object(forKey: "pref.hapticsEnabled") as? Bool ?? true
 
-        self.spatialAudioMode = SpatialAudioMode(rawValue: defaults.string(forKey: "pref.spatialAudioMode") ?? "") ?? .automatic
-        self.soundProfile = SoundProfileMode(rawValue: defaults.string(forKey: "pref.soundProfile") ?? "") ?? .cinema
-        self.pitchAlgorithm = AudioPitchAlgorithmMode(rawValue: defaults.string(forKey: "pref.pitchAlgorithm") ?? "") ?? .spectral
-        let gain = defaults.double(forKey: "pref.comfortGain")
+        self.spatialAudioMode = SpatialAudioMode(rawValue: ud.string(forKey: "pref.spatialAudioMode") ?? "") ?? .automatic
+        self.soundProfile = SoundProfileMode(rawValue: ud.string(forKey: "pref.soundProfile") ?? "") ?? .cinema
+        self.pitchAlgorithm = AudioPitchAlgorithmMode(rawValue: ud.string(forKey: "pref.pitchAlgorithm") ?? "") ?? .spectral
+        let gain = ud.double(forKey: "pref.comfortGain")
         self.comfortGain = gain > 0.1 ? gain : 1.0
 
-        self.autoRotateLandscape = defaults.object(forKey: "pref.autoRotateLandscape") as? Bool ?? false
-        self.autoPiP = defaults.object(forKey: "pref.autoPiP") as? Bool ?? true
-        let seek = defaults.integer(forKey: "pref.doubleTapSeekSeconds")
+        self.autoRotateLandscape = ud.object(forKey: "pref.autoRotateLandscape") as? Bool ?? false
+        self.autoPiP = ud.object(forKey: "pref.autoPiP") as? Bool ?? true
+        let seek = ud.integer(forKey: "pref.doubleTapSeekSeconds")
         self.doubleTapSeekSeconds = [5, 10, 15, 30].contains(seek) ? seek : 10
-        let speed = defaults.double(forKey: "pref.longPressSpeed")
+        let speed = ud.double(forKey: "pref.longPressSpeed")
         self.longPressSpeed = speed >= 1.25 ? speed : 2.0
-        let buf = defaults.double(forKey: "pref.forwardBufferSeconds")
+        let buf = ud.double(forKey: "pref.forwardBufferSeconds")
         self.forwardBufferSeconds = buf >= 5 ? buf : 45
-        self.autoCutAds = defaults.object(forKey: "pref.autoCutAds") as? Bool ?? true
-        self.introSkipBehavior = IntroSkipBehavior(rawValue: defaults.string(forKey: "pref.introSkipBehavior") ?? "") ?? .button
-        self.autoNextEpisode = defaults.object(forKey: "pref.autoNextEpisode") as? Bool ?? true
-        self.externalPlayer = ExternalPlayerOption(rawValue: defaults.string(forKey: "pref.externalPlayer") ?? "") ?? .internalPlayer
+        self.autoCutAds = ud.object(forKey: "pref.autoCutAds") as? Bool ?? true
+        self.introSkipBehavior = IntroSkipBehavior(rawValue: ud.string(forKey: "pref.introSkipBehavior") ?? "") ?? .button
+        self.autoNextEpisode = ud.object(forKey: "pref.autoNextEpisode") as? Bool ?? true
+        self.externalPlayer = ExternalPlayerOption(rawValue: ud.string(forKey: "pref.externalPlayer") ?? "") ?? .internalPlayer
     }
 
     var normalizedBaseURL: String {
