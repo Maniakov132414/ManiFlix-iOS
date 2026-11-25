@@ -6,6 +6,7 @@ import MediaPlayer
 enum OrientationController {
     static var allowedMask: UIInterfaceOrientationMask = .portrait
 
+    @available(iOS 16.0, *)
     private static func notifyAllControllers(in windowScene: UIWindowScene) {
         for window in windowScene.windows {
             var vc = window.rootViewController
