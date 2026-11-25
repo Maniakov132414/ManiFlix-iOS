@@ -16,15 +16,31 @@ struct MoviePosterCard: View {
                             .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.6)
                     )
 
-                if let badge = movie.quality ?? movie.episode_current, !badge.isEmpty {
-                    Text(badge)
-                        .font(.system(size: 9.5, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2.5)
-                        .background(Color.black.opacity(0.72))
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        .padding(6)
+                HStack {
+                    Menu {
+                        MovieContextMenuItems(movie: movie)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .background(Color.black.opacity(0.65))
+                            .clipShape(Circle())
+                    }
+                    .padding(6)
+
+                    Spacer()
+
+                    if let badge = movie.quality ?? movie.episode_current, !badge.isEmpty {
+                        Text(badge)
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2.5)
+                            .background(Color.black.opacity(0.72))
+                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .padding(6)
+                    }
                 }
             }
 
@@ -40,6 +56,7 @@ struct MoviePosterCard: View {
                     .lineLimit(1)
             }
         }
+        .movieCardContextMenu(movie)
     }
 }
 
@@ -57,6 +74,19 @@ struct DiscoverView: View {
     @State private var showAccountSheet = false
 
     private let categories = ["Tất cả", "Phim bộ", "Phim lẻ", "Hoạt hình"]
+
+    private var visibleHero: [MovieItem] {
+        heroMovies.filter { !appState.isBlocked(slug: $0.slug) }
+    }
+    private var visibleSeries: [MovieItem] {
+        (seriesMovies.isEmpty ? Array(heroMovies.prefix(12)) : seriesMovies).filter { !appState.isBlocked(slug: $0.slug) }
+    }
+    private var visibleSingle: [MovieItem] {
+        (singleMovies.isEmpty ? Array(heroMovies.dropFirst(4).prefix(12)) : singleMovies).filter { !appState.isBlocked(slug: $0.slug) }
+    }
+    private var visibleAnime: [MovieItem] {
+        animeMovies.filter { !appState.isBlocked(slug: $0.slug) }
+    }
 
     var body: some View {
         ScrollView {
@@ -101,13 +131,14 @@ struct DiscoverView: View {
                         .padding(.horizontal, 16)
                     }
 
-                    if !heroMovies.isEmpty {
+                    if !visibleHero.isEmpty {
                         TabView {
-                            ForEach(heroMovies.prefix(5)) { movie in
+                            ForEach(visibleHero.prefix(5)) { movie in
                                 NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                                     heroCard(for: movie)
                                 }
                                 .buttonStyle(.plain)
+                                .movieCardContextMenu(movie)
                             }
                         }
                         .frame(height: 288)
@@ -124,13 +155,13 @@ struct DiscoverView: View {
                     }
 
                     if selectedGenreTag == "Tất cả" || selectedGenreTag == "Phim bộ" {
-                        horizontalRail(title: "Phim bộ mới", items: seriesMovies.isEmpty ? Array(heroMovies.prefix(12)) : seriesMovies)
+                        horizontalRail(title: "Phim bộ mới", items: visibleSeries)
                     }
                     if selectedGenreTag == "Tất cả" || selectedGenreTag == "Phim lẻ" {
-                        horizontalRail(title: "Phim lẻ", items: singleMovies.isEmpty ? Array(heroMovies.dropFirst(4).prefix(12)) : singleMovies)
+                        horizontalRail(title: "Phim lẻ", items: visibleSingle)
                     }
                     if selectedGenreTag == "Tất cả" || selectedGenreTag == "Hoạt hình" {
-                        horizontalRail(title: "Hoạt hình", items: animeMovies)
+                        horizontalRail(title: "Hoạt hình", items: visibleAnime)
                     }
 
                     latestGridSection
@@ -236,16 +267,46 @@ struct DiscoverView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(appState.history.prefix(10)) { item in
-                        NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: nil)) {
+                        let cardItem = MovieItem(
+                            _id: nil,
+                            name: item.name ?? item.slug,
+                            slug: item.slug,
+                            origin_name: nil,
+                            poster_url: item.poster,
+                            thumb_url: item.poster,
+                            year: nil,
+                            type: nil,
+                            quality: nil,
+                            lang: nil,
+                            episode_current: item.episodeName,
+                            time: nil,
+                            category: nil,
+                            country: nil
+                        )
+                        NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: cardItem)) {
                             VStack(alignment: .leading, spacing: 5) {
-                                ZStack(alignment: .bottom) {
-                                    CachedAsyncImage(url: item.displayPosterURL)
-                                        .frame(width: 156, height: 92)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                ZStack(alignment: .topLeading) {
+                                    ZStack(alignment: .bottom) {
+                                        CachedAsyncImage(url: item.displayPosterURL)
+                                            .frame(width: 156, height: 92)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-                                    ProgressView(value: item.progressRatio)
-                                        .tint(prefs.accentPreset.color)
-                                        .padding(6)
+                                        ProgressView(value: item.progressRatio)
+                                            .tint(prefs.accentPreset.color)
+                                            .padding(6)
+                                    }
+
+                                    Menu {
+                                        MovieContextMenuItems(movie: cardItem)
+                                    } label: {
+                                        Image(systemName: "ellipsis")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .frame(width: 24, height: 24)
+                                            .background(Color.black.opacity(0.65))
+                                            .clipShape(Circle())
+                                    }
+                                    .padding(6)
                                 }
                                 Text(item.name ?? item.slug)
                                     .font(.caption.weight(.medium))
@@ -259,6 +320,7 @@ struct DiscoverView: View {
                             .frame(width: 156)
                         }
                         .buttonStyle(.plain)
+                        .movieCardContextMenu(cardItem)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -303,7 +365,7 @@ struct DiscoverView: View {
                 count: UIDevice.current.userInterfaceIdiom == .pad ? 4 : prefs.gridColumnsPhone
             )
             LazyVGrid(columns: cols, spacing: 14) {
-                ForEach(heroMovies) { movie in
+                ForEach(visibleHero) { movie in
                     NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                         MoviePosterCard(movie: movie)
                     }

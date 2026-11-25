@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CatalogSearchView: View {
     @ObservedObject private var prefs = AppPreferences.shared
+    @ObservedObject private var appState = AppState.shared
     @State private var query: String = ""
     @State private var results: [MovieItem] = []
     @State private var isSearching = false
@@ -58,7 +59,7 @@ struct CatalogSearchView: View {
                         count: UIDevice.current.userInterfaceIdiom == .pad ? 4 : prefs.gridColumnsPhone
                     )
                     LazyVGrid(columns: cols, spacing: 14) {
-                        ForEach(results) { movie in
+                        ForEach(results.filter { !appState.isBlocked(slug: $0.slug) }) { movie in
                             NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                                 MoviePosterCard(movie: movie)
                             }
@@ -66,6 +67,7 @@ struct CatalogSearchView: View {
                         }
                     }
                     .padding(.horizontal, 16)
+                    .padding(.bottom, 92)
                 }
             }
             .padding(.vertical, 10)

@@ -59,6 +59,8 @@ final class PlayerEngine: NSObject, ObservableObject {
     @Published var activeStreamURL: String = ""
     @Published var adMarkers: [AdMarker] = []
     @Published var activeSkipPrompt: AdMarker?
+    @Published var activeOutroPrompt: AdMarker?
+    @Published var undoSkipTime: Double?
     @Published var statusToast: String?
     @Published var isPiPActive: Bool = false
     @Published var isPiPPossible: Bool = false
@@ -77,6 +79,9 @@ final class PlayerEngine: NSObject, ObservableObject {
     private var statusObserver: NSKeyValueObservation?
     private var bufferObserver: NSKeyValueObservation?
     private var stallTimer: Task<Void, Never>?
+    private var undoClearTask: Task<Void, Never>?
+    private var promptAutoHideTask: Task<Void, Never>?
+    private var shownPromptIds = Set<String>()
     private var endObserver: NSObjectProtocol?
     private var artworkImage: UIImage?
     private var remoteCommandsConfigured = false
@@ -85,6 +90,8 @@ final class PlayerEngine: NSObject, ObservableObject {
     private var lastSavedProgressTimestamp: Double = -999
     private var skippedCutIds = Set<String>()
     private var dismissedSkipIds = Set<String>()
+    private var userSeekedInsideAdIds = Set<String>()
+    private var lastPlayPosSec: Double = 0
     private var pendingResumeSeconds: Double
 
     init(movie: MovieDetail, servers: [EpisodeServer], serverIndex: Int, episodeIndex: Int, resumeTime: Double) {
@@ -180,8 +187,13 @@ final class PlayerEngine: NSObject, ObservableObject {
         errorMessage = ""
         isBuffering = true
         activeSkipPrompt = nil
+        activeOutroPrompt = nil
+        undoSkipTime = nil
         skippedCutIds.removeAll()
         dismissedSkipIds.removeAll()
+        shownPromptIds.removeAll()
+        userSeekedInsideAdIds.removeAll()
+        lastPlayPosSec = 0
         didFailoverThisEpisode = false
 
         guard let ep = currentEpisode else {
@@ -195,8 +207,9 @@ final class PlayerEngine: NSObject, ObservableObject {
         startPlaybackStream(for: ep, useClean: usingCleanSource)
 
         let epKey = ep.slug.isEmpty ? "\(episodeIndex)" : ep.slug
+        let titleHint = (movie.origin_name?.isEmpty == false ? movie.origin_name : movie.name) ?? movie.name
         Task {
-            if let ads = try? await ManiFlixAPI.shared.fetchAdsMarkers(slug: movie.slug, ep: epKey) {
+            if let ads = try? await ManiFlixAPI.shared.fetchAdsMarkers(slug: movie.slug, ep: epKey, titleHint: titleHint) {
                 self.adMarkers = ads.markers ?? []
             } else {
                 self.adMarkers = []
@@ -352,29 +365,133 @@ final class PlayerEngine: NSObject, ObservableObject {
         }
     }
 
+    func effectiveEnd(for marker: AdMarker) -> Double {
+        if marker.openEnd == true && duration > marker.start {
+            return duration
+        }
+        return marker.end
+    }
+
+    var filteredTimelineMarkers: [AdMarker] {
+        adMarkers.filter { m in
+            let endSec = effectiveEnd(for: m)
+            guard endSec > m.start else { return false }
+            if m.type == "outro" && m.start < 30 { return false }
+            let cap = duration > 0 ? min(420.0, duration * 0.45) : 420.0
+            return (endSec - m.start) <= cap
+        }
+    }
+
     private func evaluateAdAndIntroMarkers(at sec: Double) {
         let prefs = AppPreferences.shared
-        var foundSkip: AdMarker? = nil
+        let validMarkers = filteredTimelineMarkers
 
-        for marker in adMarkers {
-            guard sec >= marker.start && sec < marker.end - 0.5 else { continue }
-            let mode = marker.mode ?? "skip"
-            if mode == "cut" && prefs.autoCutAds && !skippedCutIds.contains(marker.id) {
-                skippedCutIds.insert(marker.id)
-                seek(to: marker.end)
-                showToast("Đã bỏ qua quảng cáo")
-                return
-            } else if (mode == "skip" || marker.type == "intro" || marker.type == "outro") && prefs.introSkipBehavior != .off {
-                if prefs.introSkipBehavior == .auto && !skippedCutIds.contains(marker.id) {
-                    skippedCutIds.insert(marker.id)
-                    seek(to: marker.end)
-                    return
-                } else if !dismissedSkipIds.contains(marker.id) {
-                    foundSkip = marker
+        for m in validMarkers where (m.type == "ad" || m.mode == "cut") {
+            let endSec = effectiveEnd(for: m)
+            if sec < m.start - 1 || sec >= endSec {
+                userSeekedInsideAdIds.remove(m.id)
+            } else if abs(sec - lastPlayPosSec) > 3.5 && sec > m.start + 1.5 && sec < endSec {
+                userSeekedInsideAdIds.insert(m.id)
+            }
+        }
+
+        // 1. Auto-cut Ads (only at boundary or normal playback progression, matching watch.html)
+        if prefs.autoCutAds {
+            for marker in validMarkers {
+                let endSec = effectiveEnd(for: marker)
+                let mode = marker.mode ?? (marker.type == "ad" ? "cut" : (marker.type == "credit" ? "mark" : "skip"))
+                if mode == "cut" && !userSeekedInsideAdIds.contains(marker.id) && !skippedCutIds.contains(marker.id) {
+                    let atEntry = sec >= marker.start && sec < min(endSec, marker.start + 1.2)
+                    let crossedStart = lastPlayPosSec < marker.start && sec >= marker.start && sec < endSec
+                    if atEntry || crossedStart {
+                        skippedCutIds.insert(marker.id)
+                        lastPlayPosSec = endSec + 0.1
+                        seek(to: endSec + 0.1)
+                        showToast("Đã bỏ qua quảng cáo")
+                        return
+                    }
                 }
             }
         }
-        activeSkipPrompt = foundSkip
+        lastPlayPosSec = sec
+
+        // 2. Intro / Recap (strictly type != "outro", matching watch.html)
+        var foundIntro: AdMarker? = nil
+        if prefs.introSkipBehavior != .off {
+            for marker in validMarkers {
+                let mode = marker.mode ?? (marker.type == "ad" ? "cut" : (marker.type == "credit" ? "mark" : "skip"))
+                guard mode == "skip" && marker.type != "outro" else { continue }
+                let endSec = effectiveEnd(for: marker)
+                if sec >= marker.start && sec < endSec - 0.5 {
+                    if prefs.introSkipBehavior == .auto && !skippedCutIds.contains(marker.id) {
+                        skippedCutIds.insert(marker.id)
+                        recordUndoAnchor(previousTime: sec)
+                        seek(to: endSec + 0.1)
+                        return
+                    } else if !dismissedSkipIds.contains(marker.id) && !skippedCutIds.contains(marker.id) {
+                        foundIntro = marker
+                        break
+                    }
+                } else if sec < marker.start {
+                    shownPromptIds.remove(marker.id)
+                }
+            }
+        }
+
+        if let intro = foundIntro {
+            if !shownPromptIds.contains(intro.id) {
+                shownPromptIds.insert(intro.id)
+                activeSkipPrompt = intro
+                scheduleIntroPromptAutoHide(for: intro.id)
+            }
+        } else {
+            if activeSkipPrompt != nil {
+                activeSkipPrompt = nil
+            }
+        }
+
+        // 3. Outro / Credits window
+        var foundOutro: AdMarker? = nil
+        if prefs.introSkipBehavior != .off {
+            for marker in validMarkers where marker.type == "outro" {
+                let mode = marker.mode ?? "skip"
+                guard mode != "mark" else { continue }
+                let endSec = effectiveEnd(for: marker)
+                if sec >= marker.start && sec < endSec - 0.5 && !dismissedSkipIds.contains(marker.id) {
+                    foundOutro = marker
+                    break
+                }
+            }
+        }
+        activeOutroPrompt = foundOutro
+    }
+
+    private func scheduleIntroPromptAutoHide(for markerId: String) {
+        promptAutoHideTask?.cancel()
+        promptAutoHideTask = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            if self.activeSkipPrompt?.id == markerId {
+                self.activeSkipPrompt = nil
+            }
+        }
+    }
+
+    private func recordUndoAnchor(previousTime: Double) {
+        undoSkipTime = previousTime
+        undoClearTask?.cancel()
+        undoClearTask = Task {
+            try? await Task.sleep(nanoseconds: 5_500_000_000)
+            guard !Task.isCancelled else { return }
+            self.undoSkipTime = nil
+        }
+    }
+
+    func undoLastSkip() {
+        guard let prev = undoSkipTime else { return }
+        undoSkipTime = nil
+        seek(to: prev)
+        showToast("Đã hoàn tác vị trí trước khi bỏ qua")
     }
 
     private func maybeSyncHistory(at sec: Double) {
@@ -518,9 +635,11 @@ final class PlayerEngine: NSObject, ObservableObject {
 
     func skipActiveMarker() {
         guard let marker = activeSkipPrompt else { return }
+        let endSec = effectiveEnd(for: marker)
         skippedCutIds.insert(marker.id)
         activeSkipPrompt = nil
-        seek(to: marker.end)
+        recordUndoAnchor(previousTime: currentTime)
+        seek(to: endSec + 0.1)
         Haptics.impact(.medium)
     }
 
@@ -529,6 +648,27 @@ final class PlayerEngine: NSObject, ObservableObject {
             dismissedSkipIds.insert(marker.id)
         }
         activeSkipPrompt = nil
+    }
+
+    func handleOutroAction() {
+        guard let marker = activeOutroPrompt else { return }
+        dismissedSkipIds.insert(marker.id)
+        activeOutroPrompt = nil
+        if hasNextEpisode {
+            nextEpisode()
+        } else {
+            let endSec = effectiveEnd(for: marker)
+            recordUndoAnchor(previousTime: currentTime)
+            seek(to: min(endSec + 0.1, max(0, duration - 1)))
+        }
+        Haptics.impact(.medium)
+    }
+
+    func dismissOutroPrompt() {
+        if let marker = activeOutroPrompt {
+            dismissedSkipIds.insert(marker.id)
+        }
+        activeOutroPrompt = nil
     }
 
     func selectEpisode(serverIdx: Int, epIdx: Int) {

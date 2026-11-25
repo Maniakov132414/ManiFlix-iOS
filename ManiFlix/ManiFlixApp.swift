@@ -100,6 +100,20 @@ struct RootTabScaffold: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 58)
             }
+
+            if let banner = appState.globalBannerMessage {
+                VStack {
+                    Text(banner)
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .adaptiveGlassCapsule(interactive: false)
+                        .padding(.top, 10)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
         }
         .sheet(isPresented: Binding(
             get: { appState.deepLinkSlug != nil },

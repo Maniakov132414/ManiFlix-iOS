@@ -217,12 +217,13 @@ struct AdMarker: Codable, Identifiable, Hashable {
     let mode: String? // "cut", "skip", "mark"
     let start: Double
     let end: Double
+    let openEnd: Bool?
     let label: String?
     let source: String?
 
     enum CodingKeys: String, CodingKey {
         case idRaw = "id"
-        case type, mode, start, end, label, source
+        case type, mode, start, end, openEnd, label, source
     }
 }
 

@@ -177,6 +177,11 @@ struct ManiFlixPlayerView: View {
             }
 
             if let marker = engine.activeSkipPrompt, !isLocked {
+                let skipTitle: String = {
+                    if marker.type == "recap" { return "Bỏ qua tóm tắt" }
+                    if marker.type == "intro" { return "Bỏ qua phần giới thiệu" }
+                    return "Bỏ qua phân đoạn"
+                }()
                 VStack {
                     Spacer()
                     HStack {
@@ -185,7 +190,7 @@ struct ManiFlixPlayerView: View {
                             Button {
                                 engine.skipActiveMarker()
                             } label: {
-                                Text(marker.label ?? "Bỏ qua mở đầu")
+                                Text(skipTitle)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.white)
                             }
@@ -204,6 +209,62 @@ struct ManiFlixPlayerView: View {
                         .padding(.bottom, showControls ? 96 : 24)
                     }
                 }
+                .zIndex(35)
+            } else if engine.activeOutroPrompt != nil, !isLocked {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 10) {
+                            Button {
+                                engine.handleOutroAction()
+                            } label: {
+                                Text(engine.hasNextEpisode ? "Tập tiếp theo" : "Bỏ qua kết thúc")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                            }
+                            Button {
+                                engine.dismissOutroPrompt()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.caption)
+                                    .foregroundColor(Color(white: 0.7))
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .adaptiveGlassCapsule(interactive: true)
+                        .padding(.trailing, 20)
+                        .padding(.bottom, showControls ? 96 : 24)
+                    }
+                }
+                .zIndex(35)
+            }
+
+            if engine.undoSkipTime != nil, !isLocked {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Button {
+                            engine.undoLastSkip()
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.caption)
+                                Text("Hoàn tác")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                        }
+                        .adaptiveGlassCapsule(interactive: true)
+                        Spacer()
+                    }
+                    .padding(.leading, 20)
+                    .padding(.bottom, showControls ? 96 : 24)
+                }
+                .zIndex(35)
             }
 
             if let toast = engine.statusToast {
@@ -553,24 +614,45 @@ struct ManiFlixPlayerView: View {
                         .font(.caption.monospacedDigit())
                         .foregroundColor(.white)
 
-                    Slider(
-                        value: Binding(
-                            get: { isDraggingScrubber ? scrubPreviewTime : engine.currentTime },
-                            set: { newVal in
-                                isDraggingScrubber = true
-                                scrubPreviewTime = newVal
+                    ZStack(alignment: .center) {
+                        if engine.duration > 1 && !engine.filteredTimelineMarkers.isEmpty {
+                            GeometryReader { barGeo in
+                                let dur = max(engine.duration, 1)
+                                ForEach(engine.filteredTimelineMarkers) { mk in
+                                    let st = min(max(mk.start / dur, 0), 1)
+                                    let en = min(max(engine.effectiveEnd(for: mk) / dur, st), 1)
+                                    let w = max(3, barGeo.size.width * CGFloat(en - st))
+                                    let x = barGeo.size.width * CGFloat(st)
+                                    Rectangle()
+                                        .fill(markerSegmentColor(type: mk.type))
+                                        .frame(width: w, height: 3.5)
+                                        .cornerRadius(1.5)
+                                        .offset(x: x, y: (barGeo.size.height - 3.5) / 2)
+                                }
                             }
-                        ),
-                        in: 0...max(engine.duration, 1),
-                        onEditingChanged: { editing in
-                            if !editing {
-                                isDraggingScrubber = false
-                                engine.seek(to: scrubPreviewTime)
-                                scheduleAutoHide()
-                            }
+                            .frame(height: 28)
+                            .allowsHitTesting(false)
                         }
-                    )
-                    .tint(prefs.accentPreset.color)
+
+                        Slider(
+                            value: Binding(
+                                get: { isDraggingScrubber ? scrubPreviewTime : engine.currentTime },
+                                set: { newVal in
+                                    isDraggingScrubber = true
+                                    scrubPreviewTime = newVal
+                                }
+                            ),
+                            in: 0...max(engine.duration, 1),
+                            onEditingChanged: { editing in
+                                if !editing {
+                                    isDraggingScrubber = false
+                                    engine.seek(to: scrubPreviewTime)
+                                    scheduleAutoHide()
+                                }
+                            }
+                        )
+                        .tint(prefs.accentPreset.color)
+                    }
 
                     Text(PlayerEngine.formatTime(engine.duration))
                         .font(.caption.monospacedDigit())
@@ -884,5 +966,14 @@ struct ManiFlixPlayerView: View {
     private func setBrightness(_ val: Double) {
         let screen = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.screen }.first ?? UIScreen.main
         screen.brightness = CGFloat(val)
+    }
+
+    private func markerSegmentColor(type: String?) -> Color {
+        switch type {
+        case "ad": return Color(red: 0.13, green: 0.77, blue: 0.37)
+        case "recap": return Color(red: 0.93, green: 0.28, blue: 0.60)
+        case "credit": return Color(red: 0.96, green: 0.62, blue: 0.04)
+        default: return Color(red: 0.03, green: 0.57, blue: 0.70)
+        }
     }
 }

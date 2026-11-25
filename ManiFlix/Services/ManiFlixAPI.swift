@@ -117,11 +117,18 @@ final class ManiFlixAPI {
         )
     }
 
-    func fetchAdsMarkers(slug: String, ep: String) async throws -> AdsResponse {
+    func fetchAdsMarkers(slug: String, ep: String, titleHint: String = "") async throws -> AdsResponse {
         let encodedSlug = slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? slug
+        let digitsOnly = ep.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)
+        let cleanEp = digitsOnly.isEmpty ? (ep.isEmpty ? "1" : ep) : String(Int(digitsOnly) ?? 1)
+        let encodedEp = cleanEp.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "1"
+        var query: [URLQueryItem] = []
+        if !titleHint.isEmpty {
+            query.append(URLQueryItem(name: "title", value: titleHint))
+        }
         return try await request(
-            path: "/api/ads/\(encodedSlug)",
-            query: [URLQueryItem(name: "ep", value: ep)]
+            path: "/api/ads/\(encodedSlug)/\(encodedEp)",
+            query: query
         )
     }
 
@@ -189,6 +196,18 @@ final class ManiFlixAPI {
             "year": movie.year?.value ?? 0,
             "quality": movie.quality ?? "HD",
             "lang": movie.lang ?? "Vietsub"
+        ]
+        return try await request(path: "/api/user/favorites/toggle", method: "POST", body: body, token: token)
+    }
+
+    func toggleFavoriteItem(token: String, item: MovieItem) async throws -> FavoritesResponse {
+        let body: [String: Any] = [
+            "slug": item.slug,
+            "name": item.name,
+            "poster": item.poster_url ?? item.thumb_url ?? "",
+            "year": item.year?.value ?? 0,
+            "quality": item.quality ?? "HD",
+            "lang": item.lang ?? "Vietsub"
         ]
         return try await request(path: "/api/user/favorites/toggle", method: "POST", body: body, token: token)
     }

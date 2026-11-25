@@ -11,6 +11,13 @@ struct ActivePlaybackSession: Identifiable {
     let startTime: Double
 }
 
+struct BlockedMovieRecord: Codable, Identifiable, Hashable {
+    var id: String { slug }
+    let slug: String
+    let name: String
+    let poster: String?
+}
+
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
@@ -21,13 +28,26 @@ final class AppState: ObservableObject {
     @Published var currentUser: UserInfo?
     @Published var favorites: [FavoriteEntry] = []
     @Published var history: [HistoryEntry] = []
+    @Published var blockedMovies: [BlockedMovieRecord] = []
+    @Published var likedSlugs: Set<String> = []
     @Published var showAuthSheet = false
     @Published var isPlayerPresented = false
     @Published var activeEngine: PlayerEngine?
     @Published var deepLinkSlug: String?
+    @Published var globalBannerMessage: String?
+
+    private let blockedKey = "prefs.blockedMovies.v1"
+    private let likedKey = "prefs.likedSlugs.v1"
 
     private init() {
         self.authToken = UserDefaults.standard.string(forKey: "auth.token") ?? ""
+        if let data = UserDefaults.standard.data(forKey: blockedKey),
+           let decoded = try? JSONDecoder().decode([BlockedMovieRecord].self, from: data) {
+            self.blockedMovies = decoded
+        }
+        if let savedLikes = UserDefaults.standard.stringArray(forKey: likedKey) {
+            self.likedSlugs = Set(savedLikes)
+        }
     }
 
     var isLoggedIn: Bool {
@@ -73,6 +93,14 @@ final class AppState: ObservableObject {
         favorites.contains(where: { $0.slug == slug })
     }
 
+    func isBlocked(slug: String) -> Bool {
+        blockedMovies.contains(where: { $0.slug == slug })
+    }
+
+    func hasHistory(slug: String) -> Bool {
+        history.contains(where: { $0.slug == slug })
+    }
+
     func toggleFavorite(movie: MovieDetail) async {
         guard !authToken.isEmpty else {
             showAuthSheet = true
@@ -88,6 +116,89 @@ final class AppState: ObservableObject {
             Haptics.notify(.success)
         } catch {
             Haptics.notify(.error)
+        }
+    }
+
+    func toggleFavoriteItem(_ item: MovieItem) async {
+        guard !authToken.isEmpty else {
+            showAuthSheet = true
+            return
+        }
+        do {
+            let wasFav = isFavorite(slug: item.slug)
+            let res = try await ManiFlixAPI.shared.toggleFavoriteItem(token: authToken, item: item)
+            if let list = res.favorites {
+                self.favorites = list
+            } else {
+                await refreshLibrary()
+            }
+            Haptics.notify(.success)
+            showBanner(wasFav ? "Đã xoá khỏi Tủ phim" : "Đã thêm vào Tủ phim")
+        } catch {
+            Haptics.notify(.error)
+        }
+    }
+
+    func likeMovie(_ item: MovieItem) {
+        likedSlugs.insert(item.slug)
+        UserDefaults.standard.set(Array(likedSlugs), forKey: likedKey)
+        Haptics.impact(.light)
+        showBanner("Đã thích: sẽ gợi ý thêm phim tương tự")
+    }
+
+    func dislikeMovie(_ item: MovieItem) {
+        likedSlugs.remove(item.slug)
+        UserDefaults.standard.set(Array(likedSlugs), forKey: likedKey)
+        Haptics.impact(.light)
+        showBanner("Đã ghi nhận: giảm bớt phim tương tự")
+    }
+
+    func blockMovie(_ item: MovieItem) {
+        guard !isBlocked(slug: item.slug) else { return }
+        let rec = BlockedMovieRecord(slug: item.slug, name: item.name, poster: item.poster_url ?? item.thumb_url)
+        blockedMovies.insert(rec, at: 0)
+        persistBlocked()
+        Haptics.notify(.warning)
+        showBanner("Đã ẩn \"\(item.name)\" khỏi đề xuất")
+    }
+
+    func unblockMovie(slug: String) {
+        blockedMovies.removeAll(where: { $0.slug == slug })
+        persistBlocked()
+        Haptics.impact(.light)
+    }
+
+    private func persistBlocked() {
+        if let data = try? JSONEncoder().encode(blockedMovies) {
+            UserDefaults.standard.set(data, forKey: blockedKey)
+        }
+    }
+
+    func showBanner(_ text: String) {
+        globalBannerMessage = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            if self.globalBannerMessage == text {
+                self.globalBannerMessage = nil
+            }
+        }
+    }
+
+    func quickWatch(slug: String) async {
+        showBanner("Đang mở trình phát...")
+        do {
+            let res = try await ManiFlixAPI.shared.fetchMovieDetail(slug: slug)
+            if let movie = res.movie {
+                let servers = res.episodes ?? []
+                if let hist = history.first(where: { $0.slug == slug }) {
+                    let epIdx = min(max(0, hist.episodeIndex ?? 0), max(0, (servers.first?.server_data.count ?? 1) - 1))
+                    startPlayback(movie: movie, servers: servers, serverIndex: 0, episodeIndex: epIdx)
+                } else {
+                    startPlayback(movie: movie, servers: servers, serverIndex: 0, episodeIndex: 0)
+                }
+            }
+        } catch {
+            showBanner("Không tải được luồng phát")
         }
     }
 
@@ -133,6 +244,7 @@ final class AppState: ObservableObject {
         history.removeAll(where: { $0.slug == slug })
         guard !authToken.isEmpty else { return }
         await ManiFlixAPI.shared.deleteHistory(token: authToken, slug: slug)
+        showBanner("Đã xoá khỏi lịch sử xem")
     }
 
     func startPlayback(movie: MovieDetail, servers: [EpisodeServer], serverIndex: Int, episodeIndex: Int) {
@@ -150,7 +262,6 @@ final class AppState: ObservableObject {
             }
         }
 
-        // Reuse existing engine if user re-opens same episode from PiP
         if let existing = activeEngine,
            existing.movie.slug == movie.slug,
            existing.serverIndex == serverIndex,

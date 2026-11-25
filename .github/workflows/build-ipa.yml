@@ -43,7 +43,7 @@ jobs:
           import plistlib
           app_pl = plistlib.loads(open('ManiFlix/Info.plist', 'rb').read())
           wid_pl = plistlib.loads(open('ManiFlixWidgets/Info.plist', 'rb').read())
-          assert app_pl.get('CFBundleShortVersionString') == '1.0.1', app_pl
+          assert app_pl.get('CFBundleShortVersionString') == '1.0.2', app_pl
           assert app_pl.get('LSRequiresIPhoneOS') is True, app_pl
           assert wid_pl.get('NSExtension', {}).get('NSExtensionPointIdentifier') == 'com.apple.widgetkit-extension', wid_pl
           print('Info.plist integrity verified before archive!')
@@ -64,8 +64,8 @@ jobs:
             -archivePath /tmp/ManiFlix-Modern-NoPlug.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             APP_BUNDLE_ID=bond.maniakov.maniflix \
-            MARKETING_VERSION=1.0.1 \
-            CURRENT_PROJECT_VERSION=3 \
+            MARKETING_VERSION=1.0.2 \
+            CURRENT_PROJECT_VERSION=4 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -76,8 +76,8 @@ jobs:
           rm -rf /tmp/pkg-mod-noplug/Payload/ManiFlix.app/PlugIns
           rm -rf /tmp/pkg-mod-noplug/Payload/ManiFlix.app/_CodeSignature
           chmod +x /tmp/pkg-mod-noplug/Payload/ManiFlix.app/ManiFlix
-          (cd /tmp/pkg-mod-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17.ipa" Payload)
-          cp "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17.ipa" "$GITHUB_WORKSPACE/dist/ManiFlix.ipa"
+          (cd /tmp/pkg-mod-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17-NoPlug.ipa" Payload)
+          cp "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17-NoPlug.ipa" "$GITHUB_WORKSPACE/dist/ManiFlix.ipa"
 
           # Full + Widget (bond.maniakov.maniflix.full)
           xcodebuild archive \
@@ -89,8 +89,8 @@ jobs:
             -archivePath /tmp/ManiFlix-Modern-Full.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             APP_BUNDLE_ID=bond.maniakov.maniflix.full \
-            MARKETING_VERSION=1.0.1 \
-            CURRENT_PROJECT_VERSION=3 \
+            MARKETING_VERSION=1.0.2 \
+            CURRENT_PROJECT_VERSION=4 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -102,7 +102,7 @@ jobs:
           rm -rf /tmp/pkg-mod-full/Payload/ManiFlix.app/PlugIns/*/_CodeSignature
           chmod +x /tmp/pkg-mod-full/Payload/ManiFlix.app/ManiFlix
           chmod +x /tmp/pkg-mod-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/ManiFlixWidgets
-          (cd /tmp/pkg-mod-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Full-iOS17.ipa" Payload)
+          (cd /tmp/pkg-mod-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17-Full.ipa" Payload)
 
       - name: Build Legacy Pair (iOS 15–18+ OLED Default)
         run: |
@@ -117,8 +117,8 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
             APP_BUNDLE_ID=bond.maniakov.maniflix.legacy \
-            MARKETING_VERSION=1.0.1 \
-            CURRENT_PROJECT_VERSION=3 \
+            MARKETING_VERSION=1.0.2 \
+            CURRENT_PROJECT_VERSION=4 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -129,7 +129,7 @@ jobs:
           rm -rf /tmp/pkg-leg-noplug/Payload/ManiFlix.app/PlugIns
           rm -rf /tmp/pkg-leg-noplug/Payload/ManiFlix.app/_CodeSignature
           chmod +x /tmp/pkg-leg-noplug/Payload/ManiFlix.app/ManiFlix
-          (cd /tmp/pkg-leg-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Legacy-iOS15.ipa" Payload)
+          (cd /tmp/pkg-leg-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Legacy-iOS15-NoPlug.ipa" Payload)
 
           # Full + Widget (bond.maniakov.maniflix.legacy.full)
           xcodebuild archive \
@@ -142,8 +142,8 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
             APP_BUNDLE_ID=bond.maniakov.maniflix.legacy.full \
-            MARKETING_VERSION=1.0.1 \
-            CURRENT_PROJECT_VERSION=3 \
+            MARKETING_VERSION=1.0.2 \
+            CURRENT_PROJECT_VERSION=4 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -155,7 +155,7 @@ jobs:
           rm -rf /tmp/pkg-leg-full/Payload/ManiFlix.app/PlugIns/*/_CodeSignature
           chmod +x /tmp/pkg-leg-full/Payload/ManiFlix.app/ManiFlix
           chmod +x /tmp/pkg-leg-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/ManiFlixWidgets
-          (cd /tmp/pkg-leg-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Legacy-Full-iOS15.ipa" Payload)
+          (cd /tmp/pkg-leg-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Legacy-iOS15-Full.ipa" Payload)
 
       - name: Strict Python Validation of All 5 IPA Archives
         run: |
@@ -170,8 +170,8 @@ jobs:
                   names = zf.namelist()
                   assert not any("_CodeSignature" in n for n in names), f"{name}: found stale _CodeSignature"
                   pl = plistlib.loads(zf.read("Payload/ManiFlix.app/Info.plist"))
-                  assert pl.get("CFBundleShortVersionString") == "1.0.1", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
-                  assert pl.get("CFBundleVersion") == "3", f"{name}: wrong build {pl.get('CFBundleVersion')}"
+                  assert pl.get("CFBundleShortVersionString") == "1.0.2", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
+                  assert pl.get("CFBundleVersion") == "4", f"{name}: wrong build {pl.get('CFBundleVersion')}"
                   assert pl.get("LSRequiresIPhoneOS") is True, f"{name}: missing LSRequiresIPhoneOS"
                   assert "UILaunchScreen" in pl, f"{name}: missing UILaunchScreen"
                   exe_info = zf.getinfo("Payload/ManiFlix.app/ManiFlix")
@@ -181,7 +181,7 @@ jobs:
                       assert not any("/PlugIns/" in n for n in names), f"{name}: unexpected PlugIns"
                   else:
                       wpl = plistlib.loads(zf.read("Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/Info.plist"))
-                      assert wpl.get("CFBundleShortVersionString") == "1.0.1", f"{name}: wrong widget version"
+                      assert wpl.get("CFBundleShortVersionString") == "1.0.2", f"{name}: wrong widget version"
                       assert wpl.get("NSExtension", {}).get("NSExtensionPointIdentifier") == "com.apple.widgetkit-extension", f"{name}: widget missing NSExtension"
 
                   print(f"OK {name}: bid={pl.get('CFBundleIdentifier')} ver={pl.get('CFBundleShortVersionString')} ({pl.get('CFBundleVersion')}) minOS={pl.get('MinimumOSVersion')} size={os.path.getsize(path)}")
@@ -194,17 +194,17 @@ jobs:
           path: dist/*.ipa
           retention-days: 30
 
-      - name: Publish GitHub Release v1.0.1
+      - name: Publish GitHub Release v1.0.2
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.1
-          name: ManiFlix iOS v1.0.1 (Build 3)
+          tag_name: v1.0.2
+          name: ManiFlix iOS v1.0.2 (Build 4)
           body: |
-            ## ManiFlix Native iOS v1.0.1 (Build 3)
-            - Sửa lỗi cắt tràn viền màn hình dọc & format năm (`2014`).
-            - Sửa nút đóng trình phát (`X`), tránh đè Dynamic Island ở chế độ chuẩn, thêm tuỳ chọn tỉ lệ khung hình (`Gốc / 16:9 / 4:3 / 21:9 / Tràn viền`).
-            - Sửa nút Tài khoản ở màn hình Khám phá (hiện hồ sơ & đồng bộ khi đã đăng nhập).
-            - **Link Repo (ESign / Feather / SideStore / AltStore)**: `https://phim.maniakov.bond/repo.json`
+            ## ManiFlix Native iOS v1.0.2 (Build 4)
+            - Đồng bộ bỏ qua Intro/Outro chuẩn theo web (fix IntroDB cắt lẹm phim), thêm nút Hoàn tác 5s & thanh đánh dấu màu.
+            - Thêm menu nhấn giữ / nút 3 chấm (`•••`) cho mỗi phim (Xem ngay, Tủ phim, Thích, Giảm đề xuất, Ẩn phim).
+            - Thống nhất tên gói `.ipa`: `ManiFlix-iOS17-NoPlug.ipa`, `ManiFlix-iOS17-Full.ipa`, `ManiFlix-Legacy-iOS15-NoPlug.ipa`, `ManiFlix-Legacy-iOS15-Full.ipa`.
+            - **Link Repo**: `https://phim.maniakov.bond/repo.json`
           files: dist/*.ipa
           overwrite_files: true
           make_latest: true

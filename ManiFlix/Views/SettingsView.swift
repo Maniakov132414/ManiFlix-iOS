@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject private var spatial = AudioSpatialEngine.shared
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var updates = UpdateManager.shared
+    @State private var showHiddenMovies = false
 
     var body: some View {
         Form {
@@ -195,6 +196,10 @@ struct SettingsView: View {
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
 
+                Button("Phim đã ẩn (\(appState.blockedMovies.count))") {
+                    showHiddenMovies = true
+                }
+
                 Button("Đặt lại mặc định", role: .destructive) {
                     prefs.resetToDefaults()
                     Haptics.notify(.warning)
@@ -203,5 +208,36 @@ struct SettingsView: View {
         }
         .navigationTitle("Cài đặt")
         .adaptiveSoftScrollEdge()
+        .sheet(isPresented: $showHiddenMovies) {
+            NavigationView {
+                List {
+                    if appState.blockedMovies.isEmpty {
+                        Text("Chưa có phim nào bị ẩn.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(appState.blockedMovies) { item in
+                            HStack {
+                                Text(item.name)
+                                    .font(.subheadline)
+                                Spacer()
+                                Button("Hiện lại") {
+                                    appState.unblockMovie(slug: item.slug)
+                                }
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(prefs.accentPreset.color)
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("Phim đã ẩn")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Xong") { showHiddenMovies = false }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
     }
 }
