@@ -6,7 +6,6 @@ struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var updates = UpdateManager.shared
     @Environment(\.colorScheme) private var colorScheme
-    @State private var isSyncingTheme = false
 
     var body: some View {
         Form {
@@ -35,143 +34,31 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Giao diện") {
-                Picker("Chế độ giao diện", selection: $prefs.themeMode) {
-                    ForEach(ThemeMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
+            Section("Giao diện & Chẩn đoán") {
+                NavigationLink {
+                    ThemeSettingsView()
+                } label: {
+                    HStack {
+                        Label("Giao diện & Chủ đề", systemImage: "paintpalette")
+                        Spacer()
+                        Text(prefs.themeMode.title)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Bộ giao diện gợi ý")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(ThemePreset.presets) { preset in
-                                let isSelected = prefs.activeThemePresetId == preset.id
-                                Button {
-                                    prefs.applyPreset(preset)
-                                    Haptics.impact(.light)
-                                } label: {
-                                    HStack(spacing: 7) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color(hex: preset.bgHex))
-                                                .frame(width: 18, height: 18)
-                                                .overlay(
-                                                    Circle()
-                                                        .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 1)
-                                                )
-                                            Circle()
-                                                .fill(Color(hex: preset.accentHex))
-                                                .frame(width: 8, height: 8)
-                                        }
-                                        Text(preset.name)
-                                            .font(.caption.weight(isSelected ? .semibold : .medium))
-                                            .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 7)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(isSelected ? Color(hex: preset.accentHex).opacity(0.18) : ManiFlixTheme.cardFill(colorScheme))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .strokeBorder(isSelected ? Color(hex: preset.accentHex) : ManiFlixTheme.cardStroke(colorScheme), lineWidth: isSelected ? 1.2 : 0.6)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.vertical, 2)
+                NavigationLink {
+                    DeviceMonitorView()
+                } label: {
+                    HStack {
+                        Label("Kiểm tra mạng & Thiết bị", systemImage: "waveform.path.ecg")
+                        Spacer()
+                        Text(spatial.outputRouteName)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
                 }
-
-                HStack(spacing: 12) {
-                    Text("Màu chủ đạo")
-                    Spacer()
-                    ForEach(AccentPreset.allCases) { preset in
-                        let isSelected = prefs.customAccentHex.caseInsensitiveCompare(preset.hexString) == .orderedSame
-                        Button {
-                            prefs.accentPreset = preset
-                            Haptics.impact(.light)
-                        } label: {
-                            Circle()
-                                .fill(preset.color)
-                                .frame(width: 22, height: 22)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(ManiFlixTheme.primaryText(colorScheme), lineWidth: isSelected ? 2.2 : 0)
-                                )
-                                .scaleEffect(isSelected ? 1.1 : 1.0)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-
-                if prefs.themeMode == .custom {
-                    ColorPicker(
-                        "Màu nhấn tuỳ chỉnh",
-                        selection: Binding(
-                            get: { Color(hex: prefs.customAccentHex) },
-                            set: { prefs.customAccentHex = $0.toHexString() }
-                        ),
-                        supportsOpacity: false
-                    )
-                    ColorPicker(
-                        "Màu nền tuỳ chỉnh",
-                        selection: Binding(
-                            get: { Color(hex: prefs.customBgHex) },
-                            set: { prefs.customBgHex = $0.toHexString() }
-                        ),
-                        supportsOpacity: false
-                    )
-                    ColorPicker(
-                        "Màu thẻ / bề mặt",
-                        selection: Binding(
-                            get: { Color(hex: prefs.customSurfaceHex) },
-                            set: { prefs.customSurfaceHex = $0.toHexString() }
-                        ),
-                        supportsOpacity: false
-                    )
-                }
-
-                if appState.isLoggedIn {
-                    Button {
-                        Task {
-                            isSyncingTheme = true
-                            _ = await appState.syncThemeToServer()
-                            isSyncingTheme = false
-                        }
-                    } label: {
-                        HStack {
-                            Label("Đồng bộ lên tài khoản", systemImage: "icloud.and.arrow.up")
-                            Spacer()
-                            if isSyncingTheme {
-                                ProgressView().scaleEffect(0.8)
-                            }
-                        }
-                    }
-                }
-
-                Picker("Phong cách hiển thị", selection: $prefs.glassStyle) {
-                    ForEach(GlassUIStyle.allCases) { st in
-                        Text(st.title).tag(st)
-                    }
-                }
-
-                Toggle("Ánh nền theo ảnh phim", isOn: $prefs.ambientArtworkEnabled)
-
-                Picker("Số cột hiển thị", selection: $prefs.gridColumnsPhone) {
-                    Text("2 cột").tag(2)
-                    Text("3 cột").tag(3)
-                }
-
-                Toggle("Rung phản hồi", isOn: $prefs.hapticsEnabled)
             }
 
             Section {
