@@ -4,7 +4,11 @@ import AVKit
 import MediaPlayer
 
 enum OrientationController {
-    static var allowedMask: UIInterfaceOrientationMask = .portrait
+    static var isLargeScreenDevice: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad || min(UIScreen.main.bounds.width, UIScreen.main.bounds.height) >= 600
+    }
+
+    static var allowedMask: UIInterfaceOrientationMask = isLargeScreenDevice ? .all : .portrait
 
     @available(iOS 16.0, *)
     private static func notifyAllControllers(in windowScene: UIWindowScene) {
@@ -18,6 +22,18 @@ enum OrientationController {
     }
 
     static func setPlayerLandscape(_ landscape: Bool) {
+        if !landscape && isLargeScreenDevice {
+            allowedMask = .all
+            if #available(iOS 16.0, *) {
+                for scene in UIApplication.shared.connectedScenes {
+                    guard let windowScene = scene as? UIWindowScene else { continue }
+                    notifyAllControllers(in: windowScene)
+                }
+            }
+            UIViewController.attemptRotationToDeviceOrientation()
+            return
+        }
+
         allowedMask = landscape ? .landscape : .portrait
         let targetMask: UIInterfaceOrientationMask = landscape ? .landscapeRight : .portrait
 
@@ -42,6 +58,18 @@ enum OrientationController {
     }
 
     static func forcePortrait() {
+        if isLargeScreenDevice {
+            allowedMask = .all
+            if #available(iOS 16.0, *) {
+                for scene in UIApplication.shared.connectedScenes {
+                    guard let windowScene = scene as? UIWindowScene else { continue }
+                    notifyAllControllers(in: windowScene)
+                }
+            }
+            UIViewController.attemptRotationToDeviceOrientation()
+            return
+        }
+
         setPlayerLandscape(false)
         for delay in [0.15, 0.35] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {

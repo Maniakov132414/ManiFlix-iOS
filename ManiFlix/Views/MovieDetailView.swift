@@ -8,6 +8,7 @@ struct MovieDetailView: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
 
+    @State private var containerWidth: CGFloat = UIScreen.main.bounds.width
     @State private var detail: MovieDetail?
     @State private var servers: [EpisodeServer] = []
     @State private var franchiseSeasons: [FranchiseSeason] = []
@@ -16,6 +17,14 @@ struct MovieDetailView: View {
     @State private var isFranchiseExpanded = true
     @State private var isLoading = true
     @State private var errorMsg: String?
+
+    private var isTwoPane: Bool {
+        containerWidth >= 640
+    }
+
+    private var panePadding: CGFloat {
+        isTwoPane ? 0 : 16
+    }
 
     private var heroArtworkURL: URL? {
         detail?.displayPosterURL ?? seedMovie?.displayPosterURL ?? detail?.displayThumbURL ?? seedMovie?.displayThumbURL
@@ -34,58 +43,94 @@ struct MovieDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    headerBanner
-
                     if isLoading {
+                        headerBanner
                         ProgressView()
                             .tint(prefs.currentAccentColor)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 32)
                     } else if let err = errorMsg {
+                        headerBanner
                         Text(err)
                             .font(.subheadline)
                             .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                             .padding(.horizontal, 16)
                     } else if let movie = detail {
-                        actionButtonsRow(movie: movie)
-                        metadataBadges(movie: movie)
+                        if isTwoPane {
+                            HStack(alignment: .top, spacing: 28) {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    headerBanner
+                                    actionButtonsRow(movie: movie)
+                                    metadataBadges(movie: movie)
+                                    if !movie.plainSynopsis.isEmpty {
+                                        synopsisSection(movie: movie)
+                                    }
+                                    creditsSection(movie: movie)
+                                }
+                                .frame(maxWidth: 360, alignment: .leading)
 
-                        if franchiseSeasons.count > 1 {
-                            franchiseSection
-                        }
-
-                        episodeSelectorSection(movie: movie)
-
-                        if !movie.plainSynopsis.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Giới thiệu")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
-                                Text(movie.plainSynopsis)
-                                    .font(.subheadline)
-                                    .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
-                                    .lineSpacing(3.5)
+                                VStack(alignment: .leading, spacing: 18) {
+                                    if franchiseSeasons.count > 1 {
+                                        franchiseSection
+                                    }
+                                    episodeSelectorSection(movie: movie)
+                                    if !relatedMovies.isEmpty {
+                                        relatedMoviesRail
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 4)
-                        }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                        } else {
+                            headerBanner
+                            actionButtonsRow(movie: movie)
+                            metadataBadges(movie: movie)
 
-                        creditsSection(movie: movie)
+                            if franchiseSeasons.count > 1 {
+                                franchiseSection
+                            }
 
-                        if !relatedMovies.isEmpty {
-                            relatedMoviesRail
+                            episodeSelectorSection(movie: movie)
+
+                            if !movie.plainSynopsis.isEmpty {
+                                synopsisSection(movie: movie)
+                            }
+
+                            creditsSection(movie: movie)
+
+                            if !relatedMovies.isEmpty {
+                                relatedMoviesRail
+                            }
                         }
+                    } else {
+                        headerBanner
                     }
                 }
                 .padding(.bottom, 96)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .readContainerWidth($containerWidth)
         .adaptiveSoftScrollEdge()
         .navigationBarTitleDisplayMode(.inline)
         .task(id: slug) {
             await loadDetail()
         }
+    }
+
+    private func synopsisSection(movie: MovieDetail) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Giới thiệu")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
+            Text(movie.plainSynopsis)
+                .font(.subheadline)
+                .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
+                .lineSpacing(3.5)
+        }
+        .padding(.horizontal, panePadding)
+        .padding(.top, 4)
     }
 
     private var headerBanner: some View {
@@ -106,7 +151,7 @@ struct MovieDetailView: View {
                     .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, isTwoPane ? 8 : 20)
 
                 if let orig = detail?.origin_name ?? seedMovie?.origin_name, !orig.isEmpty {
                     Text(orig)
@@ -114,7 +159,7 @@ struct MovieDetailView: View {
                         .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, isTwoPane ? 10 : 24)
                 }
 
                 let metaParts: [String] = [
@@ -208,7 +253,7 @@ struct MovieDetailView: View {
             }
             .adaptiveGlassCard(cornerRadius: 12, interactive: true)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, panePadding)
     }
 
     private func metadataBadges(movie: MovieDetail) -> some View {
@@ -223,7 +268,7 @@ struct MovieDetailView: View {
                     if let name = cat.name, !name.isEmpty { badgePill(name) }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, panePadding)
         }
     }
 
@@ -281,7 +326,7 @@ struct MovieDetailView: View {
         }
         .padding(14)
         .adaptiveGlassCard(cornerRadius: 14)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, panePadding)
     }
 
     private func franchiseSeasonChip(_ season: FranchiseSeason) -> some View {
@@ -330,14 +375,14 @@ struct MovieDetailView: View {
                             )
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, panePadding)
                 }
 
                 if let activeSrv = servers[safe: selectedServerIdx] {
                     Text("Danh sách tập (\(activeSrv.server_data.count))")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, panePadding)
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 8)], spacing: 8) {
                         ForEach(Array(activeSrv.server_data.enumerated()), id: \.offset) { epIdx, ep in
@@ -364,7 +409,7 @@ struct MovieDetailView: View {
                             )
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, panePadding)
                 }
             }
         }
@@ -401,7 +446,7 @@ struct MovieDetailView: View {
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .adaptiveGlassCard(cornerRadius: 14)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, panePadding)
         }
     }
 
@@ -422,7 +467,7 @@ struct MovieDetailView: View {
             Text("Có thể bạn cũng thích")
                 .font(.system(size: 17, weight: .bold))
                 .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
-                .padding(.horizontal, 16)
+                .padding(.horizontal, panePadding)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 11) {
@@ -434,7 +479,7 @@ struct MovieDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, panePadding)
             }
         }
         .padding(.top, 4)

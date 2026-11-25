@@ -100,7 +100,9 @@ struct DiscoverView: View {
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    @State private var containerWidth: CGFloat = UIScreen.main.bounds.width
     @State private var heroMovies: [MovieItem] = []
     @State private var seriesMovies: [MovieItem] = []
     @State private var singleMovies: [MovieItem] = []
@@ -135,6 +137,18 @@ struct DiscoverView: View {
     private var currentAmbientURL: URL? {
         let featured = Array(visibleHero.prefix(5))
         return featured[safe: heroSelection]?.displayPosterURL ?? featured.first?.displayPosterURL
+    }
+
+    private var heroCardHeight: CGFloat {
+        horizontalSizeClass == .regular ? 346 : 294
+    }
+
+    private var heroTabHeight: CGFloat {
+        horizontalSizeClass == .regular ? 348 : 296
+    }
+
+    private var railCardWidth: CGFloat {
+        horizontalSizeClass == .regular ? 136 : 118
     }
 
     var body: some View {
@@ -176,7 +190,7 @@ struct DiscoverView: View {
                                                 .tag(idx)
                                         }
                                     }
-                                    .frame(height: 296)
+                                    .frame(height: heroTabHeight)
                                     .tabViewStyle(.page(indexDisplayMode: .never))
 
                                     if featured.count > 1 {
@@ -201,7 +215,7 @@ struct DiscoverView: View {
                             } else if isLoading {
                                 RoundedRectangle(cornerRadius: 16)
                                     .fill(ManiFlixTheme.cardFill(colorScheme))
-                                    .frame(height: 294)
+                                    .frame(height: heroCardHeight)
                                     .padding(.horizontal, 16)
                             }
 
@@ -230,6 +244,7 @@ struct DiscoverView: View {
                 .padding(.bottom, 92)
             }
         }
+        .readContainerWidth($containerWidth)
         .adaptiveSoftScrollEdge()
         .navigationTitle("Trang chủ")
         .toolbar {
@@ -307,7 +322,7 @@ struct DiscoverView: View {
                 ZStack(alignment: .bottomLeading) {
                     CachedAsyncImage(url: movie.displayThumbURL ?? movie.displayPosterURL)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 294)
+                        .frame(height: heroCardHeight)
                         .clipped()
 
                     LinearGradient(
@@ -410,7 +425,7 @@ struct DiscoverView: View {
             .padding(16)
             .allowsHitTesting(true)
         }
-        .frame(height: 294)
+        .frame(height: heroCardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -510,7 +525,7 @@ struct DiscoverView: View {
                         ForEach(items) { movie in
                             NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                                 MoviePosterCard(movie: movie)
-                                    .frame(width: 118)
+                                    .frame(width: railCardWidth)
                             }
                             .buttonStyle(.plain)
                         }
@@ -537,7 +552,7 @@ struct DiscoverView: View {
             } else {
                 let cols = Array(
                     repeating: GridItem(.flexible(), spacing: 11),
-                    count: UIDevice.current.userInterfaceIdiom == .pad ? 4 : prefs.gridColumnsPhone
+                    count: ManiFlixTheme.adaptiveGridColumnCount(width: containerWidth)
                 )
                 LazyVGrid(columns: cols, spacing: 16) {
                     ForEach(items) { movie in

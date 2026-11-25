@@ -60,6 +60,7 @@ struct RootTabScaffold: View {
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -99,6 +100,7 @@ struct RootTabScaffold: View {
 
             if let engine = appState.activeEngine, !appState.isPlayerPresented {
                 miniPiPBar(engine: engine)
+                    .frame(maxWidth: horizontalSizeClass == .regular ? 520 : .infinity)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 58)
             }

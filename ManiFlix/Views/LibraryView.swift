@@ -4,6 +4,7 @@ struct LibraryView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var prefs = AppPreferences.shared
     @Environment(\.colorScheme) private var colorScheme
+    @State private var containerWidth: CGFloat = UIScreen.main.bounds.width
     @State private var selectedSegment = 0
 
     var body: some View {
@@ -33,6 +34,7 @@ struct LibraryView: View {
             }
         }
         .background(ManiFlixTheme.background(scheme: colorScheme).ignoresSafeArea())
+        .readContainerWidth($containerWidth)
         .navigationTitle("Tủ phim")
         .refreshable {
             await appState.refreshLibrary()
@@ -157,7 +159,7 @@ struct LibraryView: View {
                 ScrollView {
                     let cols = Array(
                         repeating: GridItem(.flexible(), spacing: 11),
-                        count: UIDevice.current.userInterfaceIdiom == .pad ? 4 : prefs.gridColumnsPhone
+                        count: ManiFlixTheme.adaptiveGridColumnCount(width: containerWidth)
                     )
                     LazyVGrid(columns: cols, spacing: 14) {
                         ForEach(appState.favorites) { fav in

@@ -43,8 +43,9 @@ jobs:
           import plistlib
           app_pl = plistlib.loads(open('ManiFlix/Info.plist', 'rb').read())
           wid_pl = plistlib.loads(open('ManiFlixWidgets/Info.plist', 'rb').read())
-          assert app_pl.get('CFBundleShortVersionString') == '1.0.5', app_pl
+          assert app_pl.get('CFBundleShortVersionString') == '1.0.6', app_pl
           assert app_pl.get('LSRequiresIPhoneOS') is True, app_pl
+          assert app_pl.get('UIRequiresFullScreen') is False, app_pl
           assert wid_pl.get('NSExtension', {}).get('NSExtensionPointIdentifier') == 'com.apple.widgetkit-extension', wid_pl
           print('Info.plist integrity verified before archive!')
           "
@@ -64,8 +65,8 @@ jobs:
             -archivePath /tmp/ManiFlix-Modern-NoPlug.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             APP_BUNDLE_ID=bond.maniakov.maniflix \
-            MARKETING_VERSION=1.0.5 \
-            CURRENT_PROJECT_VERSION=7 \
+            MARKETING_VERSION=1.0.6 \
+            CURRENT_PROJECT_VERSION=8 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -89,8 +90,8 @@ jobs:
             -archivePath /tmp/ManiFlix-Modern-Full.xcarchive \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             APP_BUNDLE_ID=bond.maniakov.maniflix.full \
-            MARKETING_VERSION=1.0.5 \
-            CURRENT_PROJECT_VERSION=7 \
+            MARKETING_VERSION=1.0.6 \
+            CURRENT_PROJECT_VERSION=8 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -117,8 +118,8 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
             APP_BUNDLE_ID=bond.maniakov.maniflix.legacy \
-            MARKETING_VERSION=1.0.5 \
-            CURRENT_PROJECT_VERSION=7 \
+            MARKETING_VERSION=1.0.6 \
+            CURRENT_PROJECT_VERSION=8 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -142,8 +143,8 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="RELEASE LEGACY_UI_DEFAULT" \
             APP_BUNDLE_ID=bond.maniakov.maniflix.legacy.full \
-            MARKETING_VERSION=1.0.5 \
-            CURRENT_PROJECT_VERSION=7 \
+            MARKETING_VERSION=1.0.6 \
+            CURRENT_PROJECT_VERSION=8 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -170,9 +171,10 @@ jobs:
                   names = zf.namelist()
                   assert not any("_CodeSignature" in n for n in names), f"{name}: found stale _CodeSignature"
                   pl = plistlib.loads(zf.read("Payload/ManiFlix.app/Info.plist"))
-                  assert pl.get("CFBundleShortVersionString") == "1.0.5", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
-                  assert pl.get("CFBundleVersion") == "7", f"{name}: wrong build {pl.get('CFBundleVersion')}"
+                  assert pl.get("CFBundleShortVersionString") == "1.0.6", f"{name}: wrong version {pl.get('CFBundleShortVersionString')}"
+                  assert pl.get("CFBundleVersion") == "8", f"{name}: wrong build {pl.get('CFBundleVersion')}"
                   assert pl.get("LSRequiresIPhoneOS") is True, f"{name}: missing LSRequiresIPhoneOS"
+                  assert pl.get("UIRequiresFullScreen") is False, f"{name}: missing UIRequiresFullScreen=False"
                   assert "UILaunchScreen" in pl, f"{name}: missing UILaunchScreen"
                   exe_info = zf.getinfo("Payload/ManiFlix.app/ManiFlix")
                   assert ((exe_info.external_attr >> 16) & 0o111) != 0, f"{name}: binary not executable"
@@ -181,7 +183,7 @@ jobs:
                       assert not any("/PlugIns/" in n for n in names), f"{name}: unexpected PlugIns"
                   else:
                       wpl = plistlib.loads(zf.read("Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/Info.plist"))
-                      assert wpl.get("CFBundleShortVersionString") == "1.0.5", f"{name}: wrong widget version"
+                      assert wpl.get("CFBundleShortVersionString") == "1.0.6", f"{name}: wrong widget version"
                       assert wpl.get("NSExtension", {}).get("NSExtensionPointIdentifier") == "com.apple.widgetkit-extension", f"{name}: widget missing NSExtension"
 
                   print(f"OK {name}: bid={pl.get('CFBundleIdentifier')} ver={pl.get('CFBundleShortVersionString')} ({pl.get('CFBundleVersion')}) minOS={pl.get('MinimumOSVersion')} size={os.path.getsize(path)}")
@@ -194,16 +196,16 @@ jobs:
           path: dist/*.ipa
           retention-days: 30
 
-      - name: Publish GitHub Release v1.0.5
+      - name: Publish GitHub Release v1.0.6
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.5
-          name: ManiFlix 1.0.5
+          tag_name: v1.0.6
+          name: ManiFlix 1.0.6
           body: |
-            ## ManiFlix 1.0.5
-            - Khắc phục thanh chỉ báo (chấm chuyển trang) Hero không còn đè lên nút `+ Tủ phim` trên màn hình Trang chủ.
-            - Hệ thống giao diện hoàn chỉnh: Tự động, Sáng, Tối, Đen OLED, Tuỳ chỉnh màu + 5 bộ giao diện gợi ý & đồng bộ tài khoản.
-            - Hero banner mới với nút Xem ngay & Tủ phim trực tiếp, tỷ lệ poster 2:3 chuẩn, diễn viên/đạo diễn/quốc gia và phim gợi ý.
+            ## ManiFlix 1.0.6
+            - Hỗ trợ đầy đủ đa nhiệm iPadOS (Split View, Slide Over & Stage Manager) với xoay màn hình tự do trên iPad và màn hình lớn/gập.
+            - Bố cục 2 cột (2-Pane) tránh nếp gập trên màn hình lớn / Foldable / Duo và iPad ở trang Chi tiết phim.
+            - Lưới phim tự động thích ứng 4–6 cột theo kích thước cửa sổ, Hero banner và thanh Mini Player tối ưu cho iPad.
             - **Link Repo**: `https://phim.maniakov.bond/repo.json`
           files: dist/*.ipa
           overwrite_files: true

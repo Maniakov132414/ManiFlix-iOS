@@ -200,6 +200,13 @@ enum ManiFlixTheme {
         isLight(scheme) ? Color.black.opacity(0.045) : Color.white.opacity(0.075)
     }
 
+    static func adaptiveGridColumnCount(width: CGFloat) -> Int {
+        if width >= 1100 { return 6 }
+        if width >= 840 { return 5 }
+        if width >= 560 { return 4 }
+        return AppPreferences.shared.gridColumnsPhone
+    }
+
     static func background(oled: Bool) -> Color {
         oled ? .black : Color(red: 0.071, green: 0.071, blue: 0.078)
     }
@@ -404,6 +411,27 @@ extension View {
         #else
         self
         #endif
+    }
+
+    func readContainerWidth(_ width: Binding<CGFloat>) -> some View {
+        background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: ContainerWidthPreferenceKey.self, value: geo.size.width)
+            }
+        )
+        .onPreferenceChange(ContainerWidthPreferenceKey.self) { newWidth in
+            if newWidth > 0 && abs(width.wrappedValue - newWidth) > 1 {
+                width.wrappedValue = newWidth
+            }
+        }
+    }
+}
+
+private struct ContainerWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = UIScreen.main.bounds.width
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

@@ -4,6 +4,7 @@ struct CatalogSearchView: View {
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
+    @State private var containerWidth: CGFloat = UIScreen.main.bounds.width
     @State private var query: String = ""
     @State private var results: [MovieItem] = []
     @State private var isSearching = false
@@ -57,7 +58,7 @@ struct CatalogSearchView: View {
                 } else {
                     let cols = Array(
                         repeating: GridItem(.flexible(), spacing: 11),
-                        count: UIDevice.current.userInterfaceIdiom == .pad ? 4 : prefs.gridColumnsPhone
+                        count: ManiFlixTheme.adaptiveGridColumnCount(width: containerWidth)
                     )
                     LazyVGrid(columns: cols, spacing: 14) {
                         ForEach(results.filter { !appState.isBlocked(slug: $0.slug) }) { movie in
@@ -74,6 +75,7 @@ struct CatalogSearchView: View {
             .padding(.vertical, 10)
         }
         .background(ManiFlixTheme.background(scheme: colorScheme).ignoresSafeArea())
+        .readContainerWidth($containerWidth)
         .adaptiveSoftScrollEdge()
         .navigationTitle("Tìm kiếm")
         .searchable(text: $query, prompt: "Tên phim, diễn viên...")
