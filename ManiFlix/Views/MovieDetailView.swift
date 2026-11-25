@@ -133,6 +133,27 @@ struct MovieDetailView: View {
         .padding(.top, 4)
     }
 
+    private var headerTitleText: String {
+        detail?.name ?? seedMovie?.name ?? ""
+    }
+
+    private var headerOriginText: String? {
+        guard let orig = detail?.origin_name ?? seedMovie?.origin_name, !orig.isEmpty else { return nil }
+        return orig
+    }
+
+    private var headerMetaText: String? {
+        let rawYear = detail?.year?.value ?? seedMovie?.year?.value
+        let yearStr: String? = (rawYear ?? 0) > 0 ? String(rawYear!) : nil
+        let timeStr = detail?.time ?? seedMovie?.time
+        let langStr = detail?.lang ?? seedMovie?.lang
+        let parts = [yearStr, timeStr, langStr].compactMap { val -> String? in
+            guard let v = val, !v.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            return v
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
+    }
+
     private var headerBanner: some View {
         VStack(spacing: 14) {
             CachedAsyncImage(url: heroArtworkURL, maxPixelSize: 480)
@@ -145,14 +166,14 @@ struct MovieDetailView: View {
                 .padding(.top, 10)
 
             VStack(spacing: 5) {
-                Text(detail?.name ?? seedMovie?.name ?? "")
+                Text(headerTitleText)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, isTwoPane ? 8 : 20)
 
-                if let orig = detail?.origin_name ?? seedMovie?.origin_name, !orig.isEmpty {
+                if let orig = headerOriginText {
                     Text(orig)
                         .font(.subheadline)
                         .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
@@ -161,17 +182,8 @@ struct MovieDetailView: View {
                         .padding(.horizontal, isTwoPane ? 10 : 24)
                 }
 
-                let metaParts: [String] = [
-                    (detail?.year?.value ?? seedMovie?.year?.value).flatMap { $0 > 0 ? String($0) : nil },
-                    detail?.time ?? seedMovie?.time,
-                    detail?.lang ?? seedMovie?.lang
-                ].compactMap { val in
-                    guard let v = val, !v.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-                    return v
-                }
-
-                if !metaParts.isEmpty {
-                    Text(metaParts.joined(separator: " • "))
+                if let meta = headerMetaText {
+                    Text(meta)
                         .font(.caption.weight(.medium))
                         .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                 }
