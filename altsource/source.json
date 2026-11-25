@@ -1,0 +1,51 @@
+{
+  "name": "ManiFlix Repo",
+  "subtitle": "Rạp Phim Online Native iOS & Liquid Glass",
+  "description": "Nguồn cài đặt & tự động cập nhật ứng dụng ManiFlix Native iOS (.ipa) dành cho SideStore, AltStore và Feather.",
+  "iconURL": "https://phim.maniakov.bond/app-icon-512.png",
+  "headerURL": "https://phim.maniakov.bond/app-icon-512.png",
+  "website": "https://phim.maniakov.bond",
+  "tintColor": "#E50914",
+  "featuredApps": [
+    "bond.maniakov.maniflix"
+  ],
+  "apps": [
+    {
+      "name": "ManiFlix",
+      "bundleIdentifier": "bond.maniakov.maniflix",
+      "developerName": "Maniakov",
+      "subtitle": "Xem phim HD Không Ads • Liquid Glass & Spatial Audio",
+      "localizedDescription": "Ứng dụng ManiFlix thuần iOS với trình phát AVPlayerLayout tuỳ biến hoàn toàn, hỗ trợ Apple Spatial Audio (Multichannel + Head Tracking), xoay ngang 1 chạm, PiP, AirPlay, tự động cắt quảng cáo và bỏ qua Intro/Outro.",
+      "iconURL": "https://phim.maniakov.bond/app-icon-512.png",
+      "tintColor": "#E50914",
+      "category": "entertainment",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "buildVersion": "1",
+          "date": "2026-11-25",
+          "localizedDescription": "Hỗ trợ iOS 26 Liquid Glass & iOS 15–18 OLED, Picture in Picture, Spatial Audio, Widget màn hình chính và tự cắt quảng cáo.",
+          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix.ipa",
+          "size": 925000,
+          "minOSVersion": "15.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSMotionUsageDescription": "Cảm biến Head Tracking tối ưu Spatial Audio."
+        }
+      }
+    }
+  ],
+  "news": [
+    {
+      "title": "Ra mắt ManiFlix iOS v1.0.0",
+      "identifier": "maniflix-v1-0-0",
+      "caption": "4 bản build tối ưu riêng cho iOS 26 Liquid Glass và iOS 15–18+, hỗ trợ Spatial Audio & Custom Player.",
+      "date": "2026-11-25",
+      "tintColor": "#E50914",
+      "notify": false
+    }
+  ]
+}
