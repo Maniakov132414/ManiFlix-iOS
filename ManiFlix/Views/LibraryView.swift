@@ -3,6 +3,7 @@ import SwiftUI
 struct LibraryView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var prefs = AppPreferences.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedSegment = 0
 
     var body: some View {
@@ -31,7 +32,7 @@ struct LibraryView: View {
                 blockedMoviesList
             }
         }
-        .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
+        .background(ManiFlixTheme.background(scheme: colorScheme).ignoresSafeArea())
         .navigationTitle("Tủ phim")
         .refreshable {
             await appState.refreshLibrary()
@@ -43,13 +44,13 @@ struct LibraryView: View {
             Spacer()
             Image(systemName: "person.crop.circle")
                 .font(.system(size: 44))
-                .foregroundColor(Color(white: 0.55))
+                .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
             Text(title)
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
             Text(subtitle)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             Button {
@@ -61,7 +62,7 @@ struct LibraryView: View {
                     .padding(.horizontal, 24)
                     .padding(.vertical, 10)
             }
-            .adaptiveGlassCapsule(tint: prefs.accentPreset.color)
+            .adaptiveGlassCapsule(tint: prefs.currentAccentColor)
             Spacer()
         }
     }
@@ -90,19 +91,19 @@ struct LibraryView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                                            .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.5)
                                     )
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.name ?? entry.slug)
                                         .font(.subheadline.weight(.medium))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                                         .lineLimit(1)
                                     Text("\(entry.episodeName ?? "Tập 1") • \(PlayerEngine.formatTime(entry.currentTime ?? 0))")
                                         .font(.caption2)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                                     ProgressView(value: entry.progressRatio)
-                                        .tint(prefs.accentPreset.color)
+                                        .tint(prefs.currentAccentColor)
                                 }
                             }
                             .padding(.vertical, 3)
@@ -128,10 +129,10 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Chưa đăng nhập")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                 Text("Đăng nhập để đồng bộ lịch sử xem trên nhiều thiết bị.")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
             }
             Spacer()
             Button("Đăng nhập") {
@@ -141,7 +142,7 @@ struct LibraryView: View {
             .foregroundColor(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(prefs.accentPreset.color)
+            .background(prefs.currentAccentColor)
             .clipShape(Capsule())
         }
         .padding(12)
@@ -205,17 +206,17 @@ struct LibraryView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                                                .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.5)
                                         )
 
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(item.name)
                                             .font(.subheadline.weight(.medium))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                                             .lineLimit(2)
                                         Text("Đang ẩn khỏi trang chủ & tìm kiếm")
                                             .font(.caption2)
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                                     }
                                 }
                             }
@@ -230,7 +231,7 @@ struct LibraryView: View {
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .background(prefs.accentPreset.color)
+                                    .background(prefs.currentAccentColor)
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
@@ -243,7 +244,7 @@ struct LibraryView: View {
                             } label: {
                                 Label("Hiện lại", systemImage: "eye")
                             }
-                            .tint(prefs.accentPreset.color)
+                            .tint(prefs.currentAccentColor)
                         }
                     }
                 }
@@ -258,10 +259,10 @@ struct LibraryView: View {
             Spacer()
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(Color(white: 0.45))
+                .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
             Text(text)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
             Spacer()
         }
         .frame(maxWidth: .infinity)

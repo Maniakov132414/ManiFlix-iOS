@@ -17,8 +17,8 @@ struct ManiFlixApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabScaffold()
-                .preferredColorScheme(.dark)
-                .tint(prefs.accentPreset.color)
+                .preferredColorScheme(prefs.resolvedColorScheme)
+                .tint(prefs.currentAccentColor)
                 .task {
                     await appState.bootstrapSession()
                     await updates.checkForUpdates(manual: false)
@@ -59,6 +59,7 @@ struct ManiFlixApp: App {
 struct RootTabScaffold: View {
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -106,7 +107,7 @@ struct RootTabScaffold: View {
                 VStack {
                     Text(banner)
                         .font(.caption.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .adaptiveGlassCapsule(interactive: false)
@@ -142,11 +143,11 @@ struct RootTabScaffold: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(engine.movie.name)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                             .lineLimit(1)
                         Text(engine.isPiPActive ? "Đang phát thu nhỏ" : (engine.currentEpisode?.name ?? "Đang phát"))
                             .font(.caption2)
-                            .foregroundColor(Color(white: 0.65))
+                            .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                             .lineLimit(1)
                     }
                     Spacer(minLength: 4)
@@ -160,7 +161,7 @@ struct RootTabScaffold: View {
             } label: {
                 Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
                     .font(.body.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                     .frame(width: 34, height: 34)
             }
 
@@ -169,7 +170,7 @@ struct RootTabScaffold: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(Color(white: 0.72))
+                    .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                     .frame(width: 28, height: 34)
             }
         }

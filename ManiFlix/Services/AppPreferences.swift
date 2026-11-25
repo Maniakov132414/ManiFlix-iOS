@@ -1,5 +1,51 @@
 import Foundation
+import SwiftUI
 import Combine
+
+enum ThemeMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+    case oled
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "Tự động"
+        case .light: return "Sáng"
+        case .dark: return "Tối"
+        case .oled: return "Đen OLED"
+        case .custom: return "Tuỳ chỉnh"
+        }
+    }
+
+    var colorSchemeOverride: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark, .oled, .custom: return .dark
+        }
+    }
+}
+
+struct ThemePreset: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let mode: ThemeMode
+    let accentHex: String
+    let bgHex: String
+    let surfaceHex: String
+
+    static let presets: [ThemePreset] = [
+        ThemePreset(id: "apple-dark", name: "Apple Music Tối", mode: .dark, accentHex: "#FA2D48", bgHex: "#121214", surfaceHex: "#1C1C1E"),
+        ThemePreset(id: "pure-light", name: "Trắng Tinh Khôi", mode: .light, accentHex: "#FA2D48", bgHex: "#F4F4F7", surfaceHex: "#FFFFFF"),
+        ThemePreset(id: "midnight-indigo", name: "Midnight Indigo", mode: .custom, accentHex: "#5E5CE6", bgHex: "#0B1020", surfaceHex: "#151C32"),
+        ThemePreset(id: "forest-emerald", name: "Forest Emerald", mode: .custom, accentHex: "#30D158", bgHex: "#0B1612", surfaceHex: "#14241D"),
+        ThemePreset(id: "cyberpunk-rose", name: "Cyberpunk Rose", mode: .custom, accentHex: "#FF2D55", bgHex: "#16091A", surfaceHex: "#26112E")
+    ]
+}
 
 enum SpatialAudioMode: String, CaseIterable, Identifiable {
     case automatic
@@ -95,19 +141,77 @@ enum ExternalPlayerOption: String, CaseIterable, Identifiable {
 final class AppPreferences: ObservableObject {
     static let shared = AppPreferences()
     private let defaults = UserDefaults.standard
+    private var isSyncingTheme = false
     let baseURL = "https://phim.maniakov.bond"
 
     @Published var glassStyle: GlassUIStyle {
         didSet { defaults.set(glassStyle.rawValue, forKey: "pref.glassStyle") }
     }
+    @Published var themeMode: ThemeMode {
+        didSet {
+            defaults.set(themeMode.rawValue, forKey: "pref.themeMode")
+            guard !isSyncingTheme else { return }
+            isSyncingTheme = true
+            oledBlackEnabled = (themeMode == .oled)
+            switch themeMode {
+            case .system: activeThemePresetId = "system"
+            case .light: activeThemePresetId = "pure-light"
+            case .dark: activeThemePresetId = "apple-dark"
+            case .oled: activeThemePresetId = "oled"
+            case .custom:
+                if ["system", "pure-light", "apple-dark", "oled"].contains(activeThemePresetId) {
+                    activeThemePresetId = "custom"
+                }
+            }
+            isSyncingTheme = false
+        }
+    }
     @Published var oledBlackEnabled: Bool {
-        didSet { defaults.set(oledBlackEnabled, forKey: "pref.oledBlack") }
+        didSet {
+            defaults.set(oledBlackEnabled, forKey: "pref.oledBlack")
+            guard !isSyncingTheme else { return }
+            isSyncingTheme = true
+            if oledBlackEnabled {
+                themeMode = .oled
+                activeThemePresetId = "oled"
+            } else if themeMode == .oled {
+                themeMode = .dark
+                activeThemePresetId = "apple-dark"
+            }
+            isSyncingTheme = false
+        }
+    }
+    @Published var customAccentHex: String {
+        didSet {
+            defaults.set(customAccentHex, forKey: "pref.customAccentHex")
+            guard !isSyncingTheme else { return }
+            if let matched = AccentPreset.allCases.first(where: { $0.hexString.caseInsensitiveCompare(customAccentHex) == .orderedSame }) {
+                isSyncingTheme = true
+                accentPreset = matched
+                isSyncingTheme = false
+            }
+        }
+    }
+    @Published var customBgHex: String {
+        didSet { defaults.set(customBgHex, forKey: "pref.customBgHex") }
+    }
+    @Published var customSurfaceHex: String {
+        didSet { defaults.set(customSurfaceHex, forKey: "pref.customSurfaceHex") }
+    }
+    @Published var activeThemePresetId: String {
+        didSet { defaults.set(activeThemePresetId, forKey: "pref.activeThemePresetId") }
     }
     @Published var ambientArtworkEnabled: Bool {
         didSet { defaults.set(ambientArtworkEnabled, forKey: "pref.ambientArtwork") }
     }
     @Published var accentPreset: AccentPreset {
-        didSet { defaults.set(accentPreset.rawValue, forKey: "pref.accentPreset") }
+        didSet {
+            defaults.set(accentPreset.rawValue, forKey: "pref.accentPreset")
+            guard !isSyncingTheme else { return }
+            isSyncingTheme = true
+            customAccentHex = accentPreset.hexString
+            isSyncingTheme = false
+        }
     }
     @Published var gridColumnsPhone: Int {
         didSet { defaults.set(gridColumnsPhone, forKey: "pref.gridColumnsPhone") }
@@ -161,14 +265,39 @@ final class AppPreferences: ObservableObject {
         #if LEGACY_UI_DEFAULT
         let defaultGlass: GlassUIStyle = .legacy
         let defaultOled = true
+        let defaultThemeMode: ThemeMode = .oled
         #else
         let defaultGlass: GlassUIStyle = .adaptive
         let defaultOled = false
+        let defaultThemeMode: ThemeMode = .system
         #endif
+
+        let resolvedMode: ThemeMode = {
+            if let savedMode = defaults.string(forKey: "pref.themeMode"),
+               let parsed = ThemeMode(rawValue: savedMode) {
+                return parsed
+            }
+            if defaults.object(forKey: "pref.oledBlack") != nil {
+                return defaults.bool(forKey: "pref.oledBlack") ? .oled : .dark
+            }
+            return defaultThemeMode
+        }()
+
+        let savedAccentPreset = AccentPreset(rawValue: defaults.string(forKey: "pref.accentPreset") ?? "") ?? .crimson
+        let savedAccentHex = defaults.string(forKey: "pref.customAccentHex") ?? savedAccentPreset.hexString
+        let savedBgHex = defaults.string(forKey: "pref.customBgHex") ?? "#121214"
+        let savedSurfaceHex = defaults.string(forKey: "pref.customSurfaceHex") ?? "#1C1C1E"
+        let savedPresetId = defaults.string(forKey: "pref.activeThemePresetId") ?? (resolvedMode == .oled ? "oled" : "apple-dark")
+
         self.glassStyle = GlassUIStyle(rawValue: defaults.string(forKey: "pref.glassStyle") ?? "") ?? defaultGlass
-        self.oledBlackEnabled = defaults.object(forKey: "pref.oledBlack") as? Bool ?? defaultOled
+        self.themeMode = resolvedMode
+        self.oledBlackEnabled = (resolvedMode == .oled) || (defaults.object(forKey: "pref.oledBlack") as? Bool ?? defaultOled && resolvedMode == .oled)
+        self.customAccentHex = savedAccentHex
+        self.customBgHex = savedBgHex
+        self.customSurfaceHex = savedSurfaceHex
+        self.activeThemePresetId = savedPresetId
         self.ambientArtworkEnabled = defaults.object(forKey: "pref.ambientArtwork") as? Bool ?? true
-        self.accentPreset = AccentPreset(rawValue: defaults.string(forKey: "pref.accentPreset") ?? "") ?? .crimson
+        self.accentPreset = AccentPreset.allCases.first(where: { $0.hexString.caseInsensitiveCompare(savedAccentHex) == .orderedSame }) ?? savedAccentPreset
         let cols = defaults.integer(forKey: "pref.gridColumnsPhone")
         self.gridColumnsPhone = (cols == 2 || cols == 3) ? cols : 3
         self.hapticsEnabled = defaults.object(forKey: "pref.hapticsEnabled") as? Bool ?? true
@@ -197,16 +326,112 @@ final class AppPreferences: ObservableObject {
         baseURL
     }
 
+    var currentAccentColor: Color {
+        Color(hex: customAccentHex)
+    }
+
+    var resolvedColorScheme: ColorScheme? {
+        switch themeMode {
+        case .system: return nil
+        case .light: return .light
+        case .dark, .oled: return .dark
+        case .custom:
+            return Color(hex: customBgHex).luminance > 0.55 ? .light : .dark
+        }
+    }
+
+    var effectiveBgHexForSync: String {
+        switch themeMode {
+        case .light: return "#F4F4F7"
+        case .oled: return "#000000"
+        case .dark, .system: return "#121214"
+        case .custom: return customBgHex
+        }
+    }
+
+    var effectiveSurfaceHexForSync: String {
+        switch themeMode {
+        case .light: return "#FFFFFF"
+        case .oled: return "#19191C"
+        case .dark, .system: return "#1C1C1E"
+        case .custom: return customSurfaceHex
+        }
+    }
+
+    func applyPreset(_ preset: ThemePreset) {
+        isSyncingTheme = true
+        themeMode = preset.mode
+        oledBlackEnabled = (preset.mode == .oled)
+        customAccentHex = preset.accentHex
+        customBgHex = preset.bgHex
+        customSurfaceHex = preset.surfaceHex
+        activeThemePresetId = preset.id
+        if let matched = AccentPreset.allCases.first(where: { $0.hexString.caseInsensitiveCompare(preset.accentHex) == .orderedSame }) {
+            accentPreset = matched
+        }
+        isSyncingTheme = false
+    }
+
+    func applyServerTheme(_ config: UserThemeConfig) {
+        isSyncingTheme = true
+        defer { isSyncingTheme = false }
+
+        if let accent = config.accent, !accent.isEmpty {
+            customAccentHex = accent
+            if let matched = AccentPreset.allCases.first(where: { $0.hexString.caseInsensitiveCompare(accent) == .orderedSame }) {
+                accentPreset = matched
+            }
+        }
+        if let bg = config.bg, !bg.isEmpty {
+            customBgHex = bg
+        }
+        if let surface = config.surface, !surface.isEmpty {
+            customSurfaceHex = surface
+        }
+        if let pid = config.presetId, !pid.isEmpty {
+            activeThemePresetId = pid
+            if let preset = ThemePreset.presets.first(where: { $0.id == pid }) {
+                themeMode = preset.mode
+                oledBlackEnabled = (preset.mode == .oled)
+            } else if pid == "system" {
+                themeMode = .system
+                oledBlackEnabled = false
+            } else if pid == "oled" || config.bg == "#000000" {
+                themeMode = .oled
+                oledBlackEnabled = true
+            } else if pid == "pure-light" {
+                themeMode = .light
+                oledBlackEnabled = false
+            } else if pid == "apple-dark" {
+                themeMode = .dark
+                oledBlackEnabled = false
+            } else {
+                themeMode = .custom
+                oledBlackEnabled = false
+            }
+        }
+    }
+
     func resetToDefaults() {
+        isSyncingTheme = true
         #if LEGACY_UI_DEFAULT
         glassStyle = .legacy
+        themeMode = .oled
         oledBlackEnabled = true
+        activeThemePresetId = "oled"
         #else
         glassStyle = .adaptive
+        themeMode = .system
         oledBlackEnabled = false
+        activeThemePresetId = "system"
         #endif
+        customAccentHex = "#FA2D48"
+        customBgHex = "#121214"
+        customSurfaceHex = "#1C1C1E"
         ambientArtworkEnabled = true
         accentPreset = .crimson
+        isSyncingTheme = false
+
         gridColumnsPhone = 3
         hapticsEnabled = true
         spatialAudioMode = .automatic

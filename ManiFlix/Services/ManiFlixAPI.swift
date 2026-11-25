@@ -95,6 +95,16 @@ final class ManiFlixAPI {
         )
     }
 
+    func fetchGenre(slug: String, page: Int = 1) async throws -> CategoryPageResponse {
+        try await request(
+            path: "/api/the-loai",
+            query: [
+                URLQueryItem(name: "slug", value: slug),
+                URLQueryItem(name: "page", value: "\(page)")
+            ]
+        )
+    }
+
     func searchMovies(query: String, page: Int = 1) async throws -> SearchResponse {
         try await request(
             path: "/api/search",
@@ -214,5 +224,16 @@ final class ManiFlixAPI {
 
     func fetchAppVersion() async throws -> AppVersionResponse {
         try await request(path: "/api/app/version")
+    }
+
+    func saveUserTheme(token: String, presetId: String, accent: String, bg: String, surface: String) async throws {
+        struct ThemeSaveAck: Codable { let success: Bool? }
+        let body: [String: Any] = [
+            "presetId": presetId,
+            "accent": accent,
+            "bg": bg,
+            "surface": surface
+        ]
+        _ = try await request(path: "/api/user/theme", method: "POST", body: body, token: token) as ThemeSaveAck
     }
 }

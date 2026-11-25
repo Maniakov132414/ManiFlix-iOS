@@ -102,7 +102,7 @@ final class PlayerLayerHostUIView: UIView {
 struct AirPlayPickerButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
-        picker.activeTintColor = UIColor(AppPreferences.shared.accentPreset.color)
+        picker.activeTintColor = UIColor(AppPreferences.shared.currentAccentColor)
         picker.tintColor = .white
         picker.prioritizesVideoDevices = true
         return picker
@@ -679,7 +679,7 @@ struct ManiFlixPlayerView: View {
                                 }
                             }
                         )
-                        .tint(prefs.accentPreset.color)
+                        .tint(prefs.currentAccentColor)
                     }
 
                     Text(PlayerEngine.formatTime(engine.duration))
@@ -793,7 +793,7 @@ struct ManiFlixPlayerView: View {
                                         .padding(.vertical, 7)
                                         .foregroundColor(.white)
                                 }
-                                .adaptiveGlassCapsule(tint: idx == engine.serverIndex ? prefs.accentPreset.color : nil)
+                                .adaptiveGlassCapsule(tint: idx == engine.serverIndex ? prefs.currentAccentColor : nil)
                             }
                         }
                         .padding(.vertical, 4)
@@ -818,7 +818,7 @@ struct ManiFlixPlayerView: View {
                                 .adaptiveGlassCard(
                                     cornerRadius: 9,
                                     interactive: true,
-                                    tint: epIdx == engine.episodeIndex ? prefs.accentPreset.color : nil
+                                    tint: epIdx == engine.episodeIndex ? prefs.currentAccentColor : nil
                                 )
                             }
                         }
@@ -915,7 +915,7 @@ struct ManiFlixPlayerView: View {
                                     .padding(.vertical, 8)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(engine.playbackRate == rate ? prefs.accentPreset.color : Color.gray.opacity(0.28))
+                            .tint(engine.playbackRate == rate ? prefs.currentAccentColor : Color.gray.opacity(0.28))
                         }
                     }
                 }

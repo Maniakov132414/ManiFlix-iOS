@@ -64,6 +64,9 @@ final class AppState: ObservableObject {
         do {
             let me = try await ManiFlixAPI.shared.fetchMe(token: authToken)
             self.currentUser = me.user
+            if let themeCfg = me.user?.themeConfig {
+                AppPreferences.shared.applyServerTheme(themeCfg)
+            }
             await refreshLibrary()
         } catch {
             if case APIError.badStatus(let code, _) = error, code == 401 {
@@ -86,8 +89,32 @@ final class AppState: ObservableObject {
     func handleAuthSuccess(token: String, user: UserInfo?) async {
         self.authToken = token
         self.currentUser = user
+        if let themeCfg = user?.themeConfig {
+            AppPreferences.shared.applyServerTheme(themeCfg)
+        }
         self.showAuthSheet = false
         await refreshLibrary()
+    }
+
+    func syncThemeToServer() async -> Bool {
+        guard !authToken.isEmpty else { return false }
+        let prefs = AppPreferences.shared
+        do {
+            try await ManiFlixAPI.shared.saveUserTheme(
+                token: authToken,
+                presetId: prefs.activeThemePresetId,
+                accent: prefs.customAccentHex,
+                bg: prefs.effectiveBgHexForSync,
+                surface: prefs.effectiveSurfaceHexForSync
+            )
+            Haptics.notify(.success)
+            showBanner("Đã đồng bộ giao diện lên tài khoản")
+            return true
+        } catch {
+            Haptics.notify(.error)
+            showBanner("Không thể đồng bộ giao diện")
+            return false
+        }
     }
 
     func logout() {

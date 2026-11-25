@@ -5,6 +5,8 @@ struct SettingsView: View {
     @ObservedObject private var spatial = AudioSpatialEngine.shared
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var updates = UpdateManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isSyncingTheme = false
 
     var body: some View {
         Form {
@@ -34,10 +36,65 @@ struct SettingsView: View {
             }
 
             Section("Giao diện") {
+                Picker("Chế độ giao diện", selection: $prefs.themeMode) {
+                    ForEach(ThemeMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Bộ giao diện gợi ý")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(ThemePreset.presets) { preset in
+                                let isSelected = prefs.activeThemePresetId == preset.id
+                                Button {
+                                    prefs.applyPreset(preset)
+                                    Haptics.impact(.light)
+                                } label: {
+                                    HStack(spacing: 7) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color(hex: preset.bgHex))
+                                                .frame(width: 18, height: 18)
+                                                .overlay(
+                                                    Circle()
+                                                        .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 1)
+                                                )
+                                            Circle()
+                                                .fill(Color(hex: preset.accentHex))
+                                                .frame(width: 8, height: 8)
+                                        }
+                                        Text(preset.name)
+                                            .font(.caption.weight(isSelected ? .semibold : .medium))
+                                            .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(isSelected ? Color(hex: preset.accentHex).opacity(0.18) : ManiFlixTheme.cardFill(colorScheme))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .strokeBorder(isSelected ? Color(hex: preset.accentHex) : ManiFlixTheme.cardStroke(colorScheme), lineWidth: isSelected ? 1.2 : 0.6)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+
                 HStack(spacing: 12) {
                     Text("Màu chủ đạo")
                     Spacer()
                     ForEach(AccentPreset.allCases) { preset in
+                        let isSelected = prefs.customAccentHex.caseInsensitiveCompare(preset.hexString) == .orderedSame
                         Button {
                             prefs.accentPreset = preset
                             Haptics.impact(.light)
@@ -47,14 +104,59 @@ struct SettingsView: View {
                                 .frame(width: 22, height: 22)
                                 .overlay(
                                     Circle()
-                                        .strokeBorder(Color.white, lineWidth: prefs.accentPreset == preset ? 2.2 : 0)
+                                        .strokeBorder(ManiFlixTheme.primaryText(colorScheme), lineWidth: isSelected ? 2.2 : 0)
                                 )
-                                .scaleEffect(prefs.accentPreset == preset ? 1.1 : 1.0)
+                                .scaleEffect(isSelected ? 1.1 : 1.0)
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 2)
+
+                if prefs.themeMode == .custom {
+                    ColorPicker(
+                        "Màu nhấn tuỳ chỉnh",
+                        selection: Binding(
+                            get: { Color(hex: prefs.customAccentHex) },
+                            set: { prefs.customAccentHex = $0.toHexString() }
+                        ),
+                        supportsOpacity: false
+                    )
+                    ColorPicker(
+                        "Màu nền tuỳ chỉnh",
+                        selection: Binding(
+                            get: { Color(hex: prefs.customBgHex) },
+                            set: { prefs.customBgHex = $0.toHexString() }
+                        ),
+                        supportsOpacity: false
+                    )
+                    ColorPicker(
+                        "Màu thẻ / bề mặt",
+                        selection: Binding(
+                            get: { Color(hex: prefs.customSurfaceHex) },
+                            set: { prefs.customSurfaceHex = $0.toHexString() }
+                        ),
+                        supportsOpacity: false
+                    )
+                }
+
+                if appState.isLoggedIn {
+                    Button {
+                        Task {
+                            isSyncingTheme = true
+                            _ = await appState.syncThemeToServer()
+                            isSyncingTheme = false
+                        }
+                    } label: {
+                        HStack {
+                            Label("Đồng bộ lên tài khoản", systemImage: "icloud.and.arrow.up")
+                            Spacer()
+                            if isSyncingTheme {
+                                ProgressView().scaleEffect(0.8)
+                            }
+                        }
+                    }
+                }
 
                 Picker("Phong cách hiển thị", selection: $prefs.glassStyle) {
                     ForEach(GlassUIStyle.allCases) { st in
@@ -63,7 +165,6 @@ struct SettingsView: View {
                 }
 
                 Toggle("Ánh nền theo ảnh phim", isOn: $prefs.ambientArtworkEnabled)
-                Toggle("Nền đen thuần (OLED)", isOn: $prefs.oledBlackEnabled)
 
                 Picker("Số cột hiển thị", selection: $prefs.gridColumnsPhone) {
                     Text("2 cột").tag(2)
@@ -195,7 +296,7 @@ struct SettingsView: View {
             }
         }
         .adaptiveHiddenScrollBackground()
-        .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
+        .background(ManiFlixTheme.background(scheme: colorScheme).ignoresSafeArea())
         .navigationTitle("Cài đặt")
         .adaptiveSoftScrollEdge()
     }

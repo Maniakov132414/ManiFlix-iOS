@@ -104,7 +104,7 @@ struct AuthSheetView: View {
                                 } else {
                                     Text(isRegisterMode ? "Tạo tài khoản" : "Đăng nhập")
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(prefs.accentPreset.color)
+                                        .foregroundColor(prefs.currentAccentColor)
                                 }
                                 Spacer()
                             }
@@ -121,7 +121,8 @@ struct AuthSheetView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(prefs.resolvedColorScheme)
+        .tint(prefs.currentAccentColor)
     }
 
     private func submit() async {

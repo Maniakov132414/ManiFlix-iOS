@@ -6,10 +6,12 @@ struct MovieDetailView: View {
 
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var detail: MovieDetail?
     @State private var servers: [EpisodeServer] = []
     @State private var franchiseSeasons: [FranchiseSeason] = []
+    @State private var relatedMovies: [MovieItem] = []
     @State private var selectedServerIdx = 0
     @State private var isFranchiseExpanded = true
     @State private var isLoading = true
@@ -25,10 +27,10 @@ struct MovieDetailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            ManiFlixTheme.background(oled: prefs.oledBlackEnabled)
+            ManiFlixTheme.background(scheme: colorScheme)
                 .ignoresSafeArea()
 
-            AmbientArtworkBackground(url: heroArtworkURL, oled: prefs.oledBlackEnabled, height: 420)
+            AmbientArtworkBackground(url: heroArtworkURL, height: 420)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -36,13 +38,13 @@ struct MovieDetailView: View {
 
                     if isLoading {
                         ProgressView()
-                            .tint(.white)
+                            .tint(prefs.currentAccentColor)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 32)
                     } else if let err = errorMsg {
                         Text(err)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                             .padding(.horizontal, 16)
                     } else if let movie = detail {
                         actionButtonsRow(movie: movie)
@@ -58,14 +60,20 @@ struct MovieDetailView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Giới thiệu")
                                     .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                                 Text(movie.plainSynopsis)
                                     .font(.subheadline)
-                                    .foregroundColor(Color(white: 0.76))
+                                    .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                                     .lineSpacing(3.5)
                             }
                             .padding(.horizontal, 16)
                             .padding(.top, 4)
+                        }
+
+                        creditsSection(movie: movie)
+
+                        if !relatedMovies.isEmpty {
+                            relatedMoviesRail
                         }
                     }
                 }
@@ -87,15 +95,15 @@ struct MovieDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
+                        .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.6)
                 )
-                .shadow(color: Color.black.opacity(0.55), radius: 20, x: 0, y: 12)
+                .shadow(color: Color.black.opacity(ManiFlixTheme.isLight(colorScheme) ? 0.22 : 0.55), radius: 20, x: 0, y: 12)
                 .padding(.top, 10)
 
             VStack(spacing: 5) {
                 Text(detail?.name ?? seedMovie?.name ?? "")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, 20)
@@ -103,7 +111,7 @@ struct MovieDetailView: View {
                 if let orig = detail?.origin_name ?? seedMovie?.origin_name, !orig.isEmpty {
                     Text(orig)
                         .font(.subheadline)
-                        .foregroundColor(Color(white: 0.72))
+                        .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .padding(.horizontal, 24)
@@ -121,7 +129,7 @@ struct MovieDetailView: View {
                 if !metaParts.isEmpty {
                     Text(metaParts.joined(separator: " • "))
                         .font(.caption.weight(.medium))
-                        .foregroundColor(Color(white: 0.60))
+                        .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                 }
             }
         }
@@ -174,7 +182,7 @@ struct MovieDetailView: View {
                 .frame(height: 46)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(prefs.accentPreset.color)
+                        .fill(prefs.currentAccentColor)
                 )
             }
             .buttonStyle(.plain)
@@ -185,7 +193,7 @@ struct MovieDetailView: View {
             } label: {
                 Image(systemName: appState.isFavorite(slug: movie.slug) ? "bookmark.fill" : "bookmark")
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(appState.isFavorite(slug: movie.slug) ? prefs.accentPreset.color : .white)
+                    .foregroundColor(appState.isFavorite(slug: movie.slug) ? prefs.currentAccentColor : ManiFlixTheme.primaryText(colorScheme))
                     .frame(width: 46, height: 46)
             }
             .adaptiveGlassCard(cornerRadius: 12, interactive: true)
@@ -195,7 +203,7 @@ struct MovieDetailView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                     .frame(width: 46, height: 46)
             }
             .adaptiveGlassCard(cornerRadius: 12, interactive: true)
@@ -208,8 +216,11 @@ struct MovieDetailView: View {
             HStack(spacing: 7) {
                 if let q = movie.quality, !q.isEmpty { badgePill(q) }
                 if let ep = movie.episode_current, !ep.isEmpty { badgePill(ep) }
+                ForEach((movie.country ?? []).prefix(3)) { c in
+                    if let name = c.name, !name.isEmpty { badgePill(name) }
+                }
                 ForEach((movie.category ?? []).prefix(5)) { cat in
-                    if let name = cat.name { badgePill(name) }
+                    if let name = cat.name, !name.isEmpty { badgePill(name) }
                 }
             }
             .padding(.horizontal, 16)
@@ -219,7 +230,7 @@ struct MovieDetailView: View {
     private func badgePill(_ text: String) -> some View {
         Text(text)
             .font(.caption2.weight(.medium))
-            .foregroundColor(Color(white: 0.85))
+            .foregroundColor(ManiFlixTheme.primaryText(colorScheme).opacity(0.88))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .adaptiveGlassCapsule(interactive: false)
@@ -236,17 +247,17 @@ struct MovieDetailView: View {
                 HStack(spacing: 8) {
                     Text("Các phần phim (\(franchiseSeasons.count))")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
 
                     Spacer()
 
                     Text(isFranchiseExpanded ? "Thu gọn" : "Mở rộng")
                         .font(.caption.weight(.medium))
-                        .foregroundColor(Color(white: 0.65))
+                        .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
 
                     Image(systemName: isFranchiseExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold))
-                        .foregroundColor(prefs.accentPreset.color)
+                        .foregroundColor(prefs.currentAccentColor)
                 }
                 .contentShape(Rectangle())
             }
@@ -278,18 +289,18 @@ struct MovieDetailView: View {
         return NavigationLink(destination: MovieDetailView(slug: season.slug, seedMovie: nil)) {
             Text(season.displayFullTitle)
                 .font(.caption.weight(isCurrent ? .semibold : .medium))
-                .foregroundColor(.white)
+                .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isCurrent ? prefs.accentPreset.color.opacity(0.28) : Color.white.opacity(0.08))
+                        .fill(isCurrent ? prefs.currentAccentColor.opacity(0.24) : ManiFlixTheme.cardFill(colorScheme))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(isCurrent ? prefs.accentPreset.color : Color.white.opacity(0.12), lineWidth: isCurrent ? 1.2 : 0.6)
+                        .strokeBorder(isCurrent ? prefs.currentAccentColor : ManiFlixTheme.cardStroke(colorScheme), lineWidth: isCurrent ? 1.2 : 0.6)
                 )
         }
         .buttonStyle(.plain)
@@ -302,19 +313,20 @@ struct MovieDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(Array(servers.enumerated()), id: \.offset) { idx, srv in
+                            let selected = selectedServerIdx == idx
                             Button {
                                 selectedServerIdx = idx
                                 Haptics.impact(.light)
                             } label: {
                                 Text(srv.server_name)
                                     .font(.caption.weight(.medium))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(selected ? .white : ManiFlixTheme.primaryText(colorScheme))
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6.5)
                             }
                             .adaptiveGlassCapsule(
                                 interactive: true,
-                                tint: selectedServerIdx == idx ? prefs.accentPreset.color : nil
+                                tint: selected ? prefs.currentAccentColor : nil
                             )
                         }
                     }
@@ -324,7 +336,7 @@ struct MovieDetailView: View {
                 if let activeSrv = servers[safe: selectedServerIdx] {
                     Text("Danh sách tập (\(activeSrv.server_data.count))")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                         .padding(.horizontal, 16)
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 8)], spacing: 8) {
@@ -340,7 +352,7 @@ struct MovieDetailView: View {
                             } label: {
                                 Text(ep.name)
                                     .font(.caption.weight(isWatchedEp ? .semibold : .medium))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(isWatchedEp ? prefs.currentAccentColor : ManiFlixTheme.primaryText(colorScheme))
                                     .lineLimit(1)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 9.5)
@@ -348,7 +360,7 @@ struct MovieDetailView: View {
                             .adaptiveGlassCard(
                                 cornerRadius: 9,
                                 interactive: true,
-                                tint: isWatchedEp ? prefs.accentPreset.color : nil
+                                tint: isWatchedEp ? prefs.currentAccentColor : nil
                             )
                         }
                     }
@@ -358,9 +370,80 @@ struct MovieDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func creditsSection(movie: MovieDetail) -> some View {
+        let directors = (movie.director ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let actors = (movie.actor ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let countries = (movie.country ?? [])
+            .compactMap { $0.name?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if !directors.isEmpty || !actors.isEmpty || !countries.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Thông tin thêm")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
+
+                if !countries.isEmpty {
+                    creditRow(title: "Quốc gia", value: countries.joined(separator: ", "))
+                }
+                if !directors.isEmpty {
+                    creditRow(title: "Đạo diễn", value: directors.joined(separator: ", "))
+                }
+                if !actors.isEmpty {
+                    creditRow(title: "Diễn viên", value: actors.prefix(12).joined(separator: ", "))
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .adaptiveGlassCard(cornerRadius: 14)
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private func creditRow(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
+            Text(value)
+                .font(.caption)
+                .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var relatedMoviesRail: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Có thể bạn cũng thích")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
+                .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 11) {
+                    ForEach(relatedMovies) { item in
+                        NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: item)) {
+                            MoviePosterCard(movie: item)
+                                .frame(width: 118)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.top, 4)
+    }
+
     private func loadDetail() async {
         isLoading = true
         errorMsg = nil
+        relatedMovies = []
         do {
             let res = try await ManiFlixAPI.shared.fetchMovieDetail(slug: slug)
             self.detail = res.movie
@@ -368,9 +451,45 @@ struct MovieDetailView: View {
             if let fr = try? await ManiFlixAPI.shared.fetchFranchise(slug: slug) {
                 self.franchiseSeasons = fr.seasons ?? []
             }
+            await loadRelatedMovies(for: res.movie)
         } catch {
             self.errorMsg = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func loadRelatedMovies(for movie: MovieDetail?) async {
+        guard let movie = movie else { return }
+        var candidates: [MovieItem] = []
+
+        if let genreSlug = movie.category?.first(where: { !($0.slug ?? "").isEmpty })?.slug,
+           let res = try? await ManiFlixAPI.shared.fetchGenre(slug: genreSlug, page: 1) {
+            candidates = res.items ?? []
+        }
+
+        if candidates.isEmpty {
+            let catType: String
+            switch movie.type {
+            case "hoathinh": catType = "hoat-hinh"
+            case "series": catType = "phim-bo"
+            case "tvshows": catType = "tv-shows"
+            default: catType = "phim-le"
+            }
+            if let res = try? await ManiFlixAPI.shared.fetchCategory(type: catType, page: 1) {
+                candidates = res.items ?? []
+            }
+        }
+
+        if candidates.isEmpty, let firstWord = movie.name.split(separator: " ").first {
+            if let res = try? await ManiFlixAPI.shared.searchMovies(query: String(firstWord), page: 1) {
+                candidates = res.items ?? []
+            }
+        }
+
+        self.relatedMovies = Array(
+            candidates
+                .filter { $0.slug != slug && !appState.isBlocked(slug: $0.slug) }
+                .prefix(12)
+        )
     }
 }

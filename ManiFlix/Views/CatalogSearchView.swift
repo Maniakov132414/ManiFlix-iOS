@@ -3,6 +3,7 @@ import SwiftUI
 struct CatalogSearchView: View {
     @ObservedObject private var prefs = AppPreferences.shared
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var query: String = ""
     @State private var results: [MovieItem] = []
     @State private var isSearching = false
@@ -23,7 +24,7 @@ struct CatalogSearchView: View {
                             } label: {
                                 Text(topic)
                                     .font(.caption.weight(.medium))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
                             }
@@ -37,7 +38,7 @@ struct CatalogSearchView: View {
                     HStack {
                         Spacer()
                         ProgressView()
-                            .tint(.white)
+                            .tint(prefs.currentAccentColor)
                         Spacer()
                     }
                     .padding(.vertical, 50)
@@ -45,10 +46,10 @@ struct CatalogSearchView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .font(.title2)
-                            .foregroundColor(Color(white: 0.45))
+                            .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                         Text(hasSearched ? "Không có kết quả cho \"\(query)\"" : "Tìm theo tên phim, tên gốc hoặc diễn viên")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -72,7 +73,7 @@ struct CatalogSearchView: View {
             }
             .padding(.vertical, 10)
         }
-        .background(ManiFlixTheme.background(oled: prefs.oledBlackEnabled).ignoresSafeArea())
+        .background(ManiFlixTheme.background(scheme: colorScheme).ignoresSafeArea())
         .adaptiveSoftScrollEdge()
         .navigationTitle("Tìm kiếm")
         .searchable(text: $query, prompt: "Tên phim, diễn viên...")
