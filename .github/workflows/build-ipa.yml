@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-ipa-matrix:
     name: Build 4 ManiFlix IPA Variants
-    runs-on: macos-26
+    runs-on: macos-15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
