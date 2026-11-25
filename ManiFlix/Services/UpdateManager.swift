@@ -14,11 +14,11 @@ final class UpdateManager: ObservableObject {
     private let snoozeUntilKey = "update.softSnoozeUntil"
 
     var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.7"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.8"
     }
 
     var currentBuild: String {
-        (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "9"
+        (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "10"
     }
 
     var displayVersion: String {

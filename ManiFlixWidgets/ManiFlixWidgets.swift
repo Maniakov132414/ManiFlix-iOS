@@ -106,7 +106,7 @@ struct ManiFlixTimelineProvider: TimelineProvider {
         guard var s = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
         if s.hasPrefix("http://") || s.hasPrefix("https://") { return URL(string: s) }
         if s.hasPrefix("/") { s.removeFirst() }
-        if s.hasPrefix("uploads/") { return URL(string: "https://phimimg.com/" + s) }
+        if s.hasPrefix("upload/") || s.hasPrefix("uploads/") || s.contains("/") { return URL(string: "https://phimimg.com/" + s) }
         return URL(string: "https://phimimg.com/upload/vod/" + s)
     }
 

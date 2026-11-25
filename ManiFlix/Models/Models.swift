@@ -343,7 +343,7 @@ enum ImageURLResolver {
         if trimmed.hasPrefix("/") {
             trimmed = String(trimmed.dropFirst())
         }
-        if trimmed.hasPrefix("uploads/") {
+        if trimmed.hasPrefix("upload/") || trimmed.hasPrefix("uploads/") || trimmed.contains("/") {
             return URL(string: "https://phimimg.com/" + trimmed)
         }
         return URL(string: "https://phimimg.com/upload/vod/" + trimmed)
