@@ -76,8 +76,8 @@ jobs:
           rm -rf /tmp/pkg-mod-noplug/Payload/ManiFlix.app/PlugIns
           rm -rf /tmp/pkg-mod-noplug/Payload/ManiFlix.app/_CodeSignature
           chmod +x /tmp/pkg-mod-noplug/Payload/ManiFlix.app/ManiFlix
-          (cd /tmp/pkg-mod-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa" Payload)
-          cp "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa" "$GITHUB_WORKSPACE/dist/ManiFlix.ipa"
+          (cd /tmp/pkg-mod-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17.ipa" Payload)
+          cp "$GITHUB_WORKSPACE/dist/ManiFlix-iOS17.ipa" "$GITHUB_WORKSPACE/dist/ManiFlix.ipa"
 
           # Full + Widget (bond.maniakov.maniflix.full)
           xcodebuild archive \
@@ -102,7 +102,7 @@ jobs:
           rm -rf /tmp/pkg-mod-full/Payload/ManiFlix.app/PlugIns/*/_CodeSignature
           chmod +x /tmp/pkg-mod-full/Payload/ManiFlix.app/ManiFlix
           chmod +x /tmp/pkg-mod-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/ManiFlixWidgets
-          (cd /tmp/pkg-mod-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS26-LiquidGlass-Full.ipa" Payload)
+          (cd /tmp/pkg-mod-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Full-iOS17.ipa" Payload)
 
       - name: Build Legacy Pair (iOS 15–18+ OLED Default)
         run: |
@@ -129,7 +129,7 @@ jobs:
           rm -rf /tmp/pkg-leg-noplug/Payload/ManiFlix.app/PlugIns
           rm -rf /tmp/pkg-leg-noplug/Payload/ManiFlix.app/_CodeSignature
           chmod +x /tmp/pkg-leg-noplug/Payload/ManiFlix.app/ManiFlix
-          (cd /tmp/pkg-leg-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-NoPlugins.ipa" Payload)
+          (cd /tmp/pkg-leg-noplug && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Legacy-iOS15.ipa" Payload)
 
           # Full + Widget (bond.maniakov.maniflix.legacy.full)
           xcodebuild archive \
@@ -155,7 +155,7 @@ jobs:
           rm -rf /tmp/pkg-leg-full/Payload/ManiFlix.app/PlugIns/*/_CodeSignature
           chmod +x /tmp/pkg-leg-full/Payload/ManiFlix.app/ManiFlix
           chmod +x /tmp/pkg-leg-full/Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/ManiFlixWidgets
-          (cd /tmp/pkg-leg-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-iOS15-Legacy-Full.ipa" Payload)
+          (cd /tmp/pkg-leg-full && zip -qry "$GITHUB_WORKSPACE/dist/ManiFlix-Legacy-Full-iOS15.ipa" Payload)
 
       - name: Strict Python Validation of All 5 IPA Archives
         run: |
@@ -177,7 +177,7 @@ jobs:
                   exe_info = zf.getinfo("Payload/ManiFlix.app/ManiFlix")
                   assert ((exe_info.external_attr >> 16) & 0o111) != 0, f"{name}: binary not executable"
 
-                  if "NoPlugins" in name or name == "ManiFlix.ipa":
+                  if "Full" not in name:
                       assert not any("/PlugIns/" in n for n in names), f"{name}: unexpected PlugIns"
                   else:
                       wpl = plistlib.loads(zf.read("Payload/ManiFlix.app/PlugIns/ManiFlixWidgets.appex/Info.plist"))

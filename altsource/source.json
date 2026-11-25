@@ -14,19 +14,19 @@
   ],
   "apps": [
     {
-      "name": "ManiFlix (iOS 17–26+)",
+      "name": "ManiFlix iOS 17+",
       "bundleIdentifier": "bond.maniakov.maniflix",
       "developerName": "Maniakov",
-      "subtitle": "Liquid Glass (iOS 26+) • No Plugins (Khuyên dùng ký 1 App ID)",
-      "localizedDescription": "Ứng dụng ManiFlix Native iOS với Liquid Glass trên iOS 26+, chạy mượt iOS 17–18, Picture in Picture, Apple Spatial Audio và tự cắt quảng cáo.",
+      "subtitle": "Liquid Glass (iOS 26+) • NoPlug (1 App ID)",
+      "localizedDescription": "Bản chính tối ưu cho ESign/SideStore/AltStore (không PlugIns). Hỗ trợ Liquid Glass trên iOS 26+, PiP, Spatial Audio & tự cắt quảng cáo.",
       "iconURL": "https://phim.maniakov.bond/app-icon-512.png",
       "tintColor": "#E50914",
       "category": "entertainment",
       "type": 1,
       "version": "1.0.1",
       "versionDate": "2026-11-25T12:40:00+07:00",
-      "versionDescription": "Sửa tràn viền dọc & năm phát hành, sửa nút đóng (X) & Account, tránh đè Dynamic Island và thêm chọn tỉ lệ 16:9 / 4:3 / Tràn viền.",
-      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa",
+      "versionDescription": "Sửa tràn viền dọc, nút đóng (X) trình phát, nút Tài khoản & thêm chọn tỉ lệ 16:9 / 4:3.",
+      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS17.ipa",
       "size": 930000,
       "versions": [
         {
@@ -34,9 +34,9 @@
           "buildVersion": "3",
           "date": "2026-11-25",
           "versionDate": "2026-11-25",
-          "localizedDescription": "Sửa tràn viền dọc & năm phát hành, sửa nút đóng (X) & Account, thêm tỉ lệ 16:9 / 4:3.",
-          "versionDescription": "Sửa tràn viền dọc & năm phát hành, sửa nút đóng (X) & Account, thêm tỉ lệ 16:9 / 4:3.",
-          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS26-LiquidGlass-NoPlugins.ipa",
+          "localizedDescription": "Sửa tràn viền dọc, nút đóng (X) trình phát, nút Tài khoản & thêm chọn tỉ lệ 16:9 / 4:3.",
+          "versionDescription": "Sửa tràn viền dọc, nút đóng (X) trình phát, nút Tài khoản & thêm chọn tỉ lệ 16:9 / 4:3.",
+          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS17.ipa",
           "size": 930000,
           "minOSVersion": "17.0"
         }
@@ -49,7 +49,7 @@
       }
     },
     {
-      "name": "ManiFlix Full (iOS 17–26+ • Widget)",
+      "name": "ManiFlix Full iOS 17+",
       "bundleIdentifier": "bond.maniakov.maniflix.full",
       "developerName": "Maniakov",
       "subtitle": "Liquid Glass + Widget Màn Hình Chính",
@@ -61,7 +61,7 @@
       "version": "1.0.1",
       "versionDate": "2026-11-25T12:40:00+07:00",
       "versionDescription": "v1.0.1 Build 3 (Full + Widget).",
-      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS26-LiquidGlass-Full.ipa",
+      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-Full-iOS17.ipa",
       "size": 960000,
       "versions": [
         {
@@ -71,7 +71,7 @@
           "versionDate": "2026-11-25",
           "localizedDescription": "v1.0.1 Build 3 (Full + Widget).",
           "versionDescription": "v1.0.1 Build 3 (Full + Widget).",
-          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS26-LiquidGlass-Full.ipa",
+          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-Full-iOS17.ipa",
           "size": 960000,
           "minOSVersion": "17.0"
         }
@@ -84,11 +84,11 @@
       }
     },
     {
-      "name": "ManiFlix Legacy (iOS 15–18+)",
+      "name": "ManiFlix Legacy iOS 15+",
       "bundleIdentifier": "bond.maniakov.maniflix.legacy",
       "developerName": "Maniakov",
-      "subtitle": "Giao diện OLED cổ điển • No Plugins (1 App ID)",
-      "localizedDescription": "Tối ưu cho máy chạy iOS 15–18 dùng giao diện OLED truyền thống, không PlugIns.",
+      "subtitle": "OLED cổ điển • NoPlug (1 App ID)",
+      "localizedDescription": "Tối ưu cho máy chạy iOS 15+ dùng giao diện OLED truyền thống, không PlugIns.",
       "iconURL": "https://phim.maniakov.bond/app-icon-512.png",
       "tintColor": "#E50914",
       "category": "entertainment",
@@ -96,7 +96,7 @@
       "version": "1.0.1",
       "versionDate": "2026-11-25T12:40:00+07:00",
       "versionDescription": "v1.0.1 Build 3 (Legacy OLED).",
-      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS15-Legacy-NoPlugins.ipa",
+      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-Legacy-iOS15.ipa",
       "size": 925000,
       "versions": [
         {
@@ -106,7 +106,7 @@
           "versionDate": "2026-11-25",
           "localizedDescription": "v1.0.1 Build 3 (Legacy OLED).",
           "versionDescription": "v1.0.1 Build 3 (Legacy OLED).",
-          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS15-Legacy-NoPlugins.ipa",
+          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-Legacy-iOS15.ipa",
           "size": 925000,
           "minOSVersion": "15.0"
         }
@@ -119,11 +119,11 @@
       }
     },
     {
-      "name": "ManiFlix Legacy Full (iOS 15–18+ • Widget)",
+      "name": "ManiFlix Legacy Full iOS 15+",
       "bundleIdentifier": "bond.maniakov.maniflix.legacy.full",
       "developerName": "Maniakov",
-      "subtitle": "Giao diện OLED cổ điển + Widget",
-      "localizedDescription": "Bản iOS 15.0+ giao diện OLED truyền thống kèm Widget màn hình chính.",
+      "subtitle": "OLED cổ điển + Widget",
+      "localizedDescription": "Bản iOS 15+ giao diện OLED truyền thống kèm Widget màn hình chính.",
       "iconURL": "https://phim.maniakov.bond/app-icon-512.png",
       "tintColor": "#E50914",
       "category": "entertainment",
@@ -131,7 +131,7 @@
       "version": "1.0.1",
       "versionDate": "2026-11-25T12:40:00+07:00",
       "versionDescription": "v1.0.1 Build 3 (Legacy OLED + Widget).",
-      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS15-Legacy-Full.ipa",
+      "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-Legacy-Full-iOS15.ipa",
       "size": 950000,
       "versions": [
         {
@@ -141,7 +141,7 @@
           "versionDate": "2026-11-25",
           "localizedDescription": "v1.0.1 Build 3 (Legacy OLED + Widget).",
           "versionDescription": "v1.0.1 Build 3 (Legacy OLED + Widget).",
-          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-iOS15-Legacy-Full.ipa",
+          "downloadURL": "https://github.com/Maniakov132414/ManiFlix-iOS/releases/latest/download/ManiFlix-Legacy-Full-iOS15.ipa",
           "size": 950000,
           "minOSVersion": "15.0"
         }
@@ -158,7 +158,7 @@
     {
       "title": "ManiFlix iOS v1.0.1",
       "identifier": "maniflix-v1-0-1",
-      "caption": "Sửa tràn viền dọc, nút đóng (X) trình phát, nút Account và thêm chọn tỉ lệ 16:9 / 4:3.",
+      "caption": "Sửa tràn viền dọc, nút đóng (X) trình phát, nút Tài khoản và chọn tỉ lệ 16:9 / 4:3.",
       "date": "2026-11-25",
       "tintColor": "#E50914",
       "notify": false
