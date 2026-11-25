@@ -119,7 +119,7 @@ private enum HardwareModelMapper {
 
 @MainActor
 private final class DeviceMonitorViewModel: ObservableObject {
-    @Published var isLiveProbeEnabled = true
+    @Published var isLiveProbeEnabled = false
     @Published var isRunningSpeedtest = false
     @Published var isConnected = false
     @Published var rxMbps: Double = 0
@@ -143,15 +143,25 @@ private final class DeviceMonitorViewModel: ObservableObject {
     private var pollTask: Task<Void, Never>?
     private let baseURL = AppPreferences.shared.normalizedBaseURL
 
+    private static let cfPingURL = URL(string: "https://speed.cloudflare.com/__down?bytes=0")!
+    private static let cfDown5MBURL = URL(string: "https://speed.cloudflare.com/__down?bytes=5000000")!
+    private static let cfDown1MBURL = URL(string: "https://speed.cloudflare.com/__down?bytes=1000000")!
+    private static let cfUploadURL = URL(string: "https://speed.cloudflare.com/__up")!
+
     func start() {
         refreshHardwareSnapshots()
         pollTask?.cancel()
         pollTask = Task {
-            await pollCycle(includeProbe: true)
+            await fetchNetStats()
+            await runFullSpeedtest(triggerHaptic: false)
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
                 if Task.isCancelled { break }
-                await pollCycle(includeProbe: isLiveProbeEnabled)
+                refreshHardwareSnapshots()
+                await fetchNetStats()
+                if isLiveProbeEnabled && !isRunningSpeedtest {
+                    await runLiveProbeCycle()
+                }
             }
         }
     }
@@ -166,25 +176,27 @@ private final class DeviceMonitorViewModel: ObservableObject {
     }
 
     func runSpeedtestNow() async {
+        await runFullSpeedtest(triggerHaptic: true)
+    }
+
+    private func runFullSpeedtest(triggerHaptic: Bool) async {
         guard !isRunningSpeedtest else { return }
         isRunningSpeedtest = true
         defer { isRunningSpeedtest = false }
 
         refreshHardwareSnapshots()
         await fetchNetStats()
-        await measurePingAndJitter(samples: 3)
-        await measureDownload(kb: 256)
-        await measureUpload(kb: 128)
-        Haptics.notify(.success)
+        await measurePingAndJitter(samples: 4, includeWarmup: true)
+        await measureDownloadParallel(streams: 4, cfURL: Self.cfDown5MBURL, fallbackKB: 2048)
+        await measureUploadParallel(streams: 2)
+        if triggerHaptic {
+            Haptics.notify(.success)
+        }
     }
 
-    private func pollCycle(includeProbe: Bool) async {
-        refreshHardwareSnapshots()
-        await fetchNetStats()
-        if includeProbe && !isRunningSpeedtest {
-            await measurePingAndJitter(samples: 1)
-            await measureDownload(kb: 128)
-        }
+    private func runLiveProbeCycle() async {
+        await measurePingAndJitter(samples: 1, includeWarmup: false)
+        await measureDownloadParallel(streams: 1, cfURL: Self.cfDown1MBURL, fallbackKB: 1024)
     }
 
     private func fetchNetStats() async {
@@ -213,13 +225,24 @@ private final class DeviceMonitorViewModel: ObservableObject {
         }
     }
 
-    private func measurePingAndJitter(samples: Int) async {
-        guard let url = URL(string: "\(baseURL)/api/net-probe?kb=4") else { return }
+    private func makeProbeRequest(url: URL, method: String = "GET", timeout: TimeInterval = 12) -> URLRequest {
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.timeoutInterval = timeout
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        req.setValue("ManiFlix-iOS/1.0", forHTTPHeaderField: "User-Agent")
+        return req
+    }
+
+    private func runPingProbes(url: URL, samples: Int, includeWarmup: Bool) async -> [Double] {
+        if includeWarmup {
+            let warmupReq = makeProbeRequest(url: url, timeout: 6)
+            _ = try? await URLSession.shared.data(for: warmupReq)
+        }
         var pings: [Double] = []
         for _ in 0..<max(1, samples) {
-            var req = URLRequest(url: url)
-            req.timeoutInterval = 6
-            req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            let req = makeProbeRequest(url: url, timeout: 6)
             let t0 = CFAbsoluteTimeGetCurrent()
             if let (_, response) = try? await URLSession.shared.data(for: req),
                let http = response as? HTTPURLResponse,
@@ -227,6 +250,14 @@ private final class DeviceMonitorViewModel: ObservableObject {
                 let elapsedMs = max(1, (CFAbsoluteTimeGetCurrent() - t0) * 1000.0)
                 pings.append(elapsedMs)
             }
+        }
+        return pings
+    }
+
+    private func measurePingAndJitter(samples: Int, includeWarmup: Bool) async {
+        var pings = await runPingProbes(url: Self.cfPingURL, samples: samples, includeWarmup: includeWarmup)
+        if pings.isEmpty, let fallbackURL = URL(string: "\(baseURL)/api/net-probe?kb=1") {
+            pings = await runPingProbes(url: fallbackURL, samples: samples, includeWarmup: includeWarmup)
         }
         guard !pings.isEmpty else { return }
         let avgPing = pings.reduce(0, +) / Double(pings.count)
@@ -242,36 +273,111 @@ private final class DeviceMonitorViewModel: ObservableObject {
         appendSample(&pingHistory, value: avgPing)
     }
 
-    private func measureDownload(kb: Int) async {
-        guard let url = URL(string: "\(baseURL)/api/net-probe?kb=\(kb)") else { return }
-        var req = URLRequest(url: url)
-        req.timeoutInterval = 12
-        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        let t0 = CFAbsoluteTimeGetCurrent()
-        do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            let elapsed = max(0.005, CFAbsoluteTimeGetCurrent() - t0)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return }
-            let mbps = (Double(data.count) * 8.0) / elapsed / 1_000_000.0
-            downloadMbps = mbps
-            appendSample(&speedHistory, value: mbps)
-        } catch {}
+    private func streamDownloadParallel(url: URL, streams: Int) async -> Double? {
+        let count = max(1, streams)
+        let results: [(start: CFAbsoluteTime, end: CFAbsoluteTime, bytes: Int64)] = await withTaskGroup(
+            of: (CFAbsoluteTime, CFAbsoluteTime, Int64)?.self
+        ) { group in
+            for _ in 0..<count {
+                group.addTask {
+                    var req = URLRequest(url: url)
+                    req.timeoutInterval = 20
+                    req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+                    req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+                    req.setValue("ManiFlix-iOS/1.0", forHTTPHeaderField: "User-Agent")
+                    do {
+                        let (asyncBytes, response) = try await URLSession.shared.bytes(for: req)
+                        guard let http = response as? HTTPURLResponse,
+                              (200..<300).contains(http.statusCode) else {
+                            return nil
+                        }
+                        let tStart = CFAbsoluteTimeGetCurrent()
+                        var byteCount: Int64 = 0
+                        for try await _ in asyncBytes {
+                            byteCount += 1
+                        }
+                        let tEnd = CFAbsoluteTimeGetCurrent()
+                        guard byteCount > 0 else { return nil }
+                        return (tStart, tEnd, byteCount)
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+            var collected: [(CFAbsoluteTime, CFAbsoluteTime, Int64)] = []
+            for await item in group {
+                if let item {
+                    collected.append(item)
+                }
+            }
+            return collected
+        }
+
+        guard !results.isEmpty else { return nil }
+        let totalBytes = results.reduce(Int64(0)) { $0 + $1.bytes }
+        guard totalBytes > 0,
+              let minStart = results.map(\.start).min(),
+              let maxEnd = results.map(\.end).max() else {
+            return nil
+        }
+        let maxStreamElapsed = results.map { $0.end - $0.start }.max() ?? 0.005
+        let elapsed = max(0.005, max(maxEnd - minStart, maxStreamElapsed))
+        return (Double(totalBytes) * 8.0) / elapsed / 1_000_000.0
     }
 
-    private func measureUpload(kb: Int) async {
-        guard let url = URL(string: "\(baseURL)/api/net-up") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.timeoutInterval = 12
-        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        let payload = Data(repeating: 0x4D, count: kb * 1024)
+    private func measureDownloadParallel(streams: Int, cfURL: URL, fallbackKB: Int) async {
+        var mbps = await streamDownloadParallel(url: cfURL, streams: streams)
+        if mbps == nil, let fallbackURL = URL(string: "\(baseURL)/api/net-probe?kb=\(fallbackKB)") {
+            mbps = await streamDownloadParallel(url: fallbackURL, streams: streams)
+        }
+        guard let measured = mbps, measured > 0 else { return }
+        downloadMbps = measured
+        appendSample(&speedHistory, value: measured)
+    }
+
+    private func postUploadParallel(url: URL, payloadBytes: Int, streams: Int) async -> Double? {
+        let count = max(1, streams)
+        let payload = Data(repeating: 0x4D, count: payloadBytes)
         let t0 = CFAbsoluteTimeGetCurrent()
-        do {
-            let (_, response) = try await URLSession.shared.upload(for: req, from: payload)
-            let elapsed = max(0.005, CFAbsoluteTimeGetCurrent() - t0)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return }
-            uploadMbps = (Double(payload.count) * 8.0) / elapsed / 1_000_000.0
-        } catch {}
+        let totalUploaded: Int64 = await withTaskGroup(of: Int64.self) { group in
+            for _ in 0..<count {
+                group.addTask {
+                    var req = URLRequest(url: url)
+                    req.httpMethod = "POST"
+                    req.timeoutInterval = 20
+                    req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+                    req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+                    req.setValue("ManiFlix-iOS/1.0", forHTTPHeaderField: "User-Agent")
+                    do {
+                        let (_, response) = try await URLSession.shared.upload(for: req, from: payload)
+                        guard let http = response as? HTTPURLResponse,
+                              (200..<300).contains(http.statusCode) else {
+                            return 0
+                        }
+                        return Int64(payloadBytes)
+                    } catch {
+                        return 0
+                    }
+                }
+            }
+            var sum: Int64 = 0
+            for await bytes in group {
+                sum += bytes
+            }
+            return sum
+        }
+        guard totalUploaded > 0 else { return nil }
+        let elapsed = max(0.005, CFAbsoluteTimeGetCurrent() - t0)
+        return (Double(totalUploaded) * 8.0) / elapsed / 1_000_000.0
+    }
+
+    private func measureUploadParallel(streams: Int) async {
+        var mbps = await postUploadParallel(url: Self.cfUploadURL, payloadBytes: 1_000_000, streams: streams)
+        if mbps == nil, let fallbackURL = URL(string: "\(baseURL)/api/net-up") {
+            mbps = await postUploadParallel(url: fallbackURL, payloadBytes: 512 * 1024, streams: streams)
+        }
+        guard let measured = mbps, measured > 0 else { return }
+        uploadMbps = measured
     }
 
     private func appendSample(_ arr: inout [Double], value: Double) {
