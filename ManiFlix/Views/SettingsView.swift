@@ -61,6 +61,22 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Widget màn hình chính") {
+                Picker("Nội dung ưu tiên", selection: $prefs.widgetFeedMode) {
+                    ForEach(WidgetFeedMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+
+                Button {
+                    WidgetSyncBridge.shared.syncFromCurrentState(force: true)
+                    appState.showBanner("Đã làm mới dữ liệu Widget")
+                    Haptics.notify(.success)
+                } label: {
+                    Label("Làm mới Widget ngay", systemImage: "arrow.clockwise")
+                }
+            }
+
             Section {
                 HStack {
                     Text("Đầu ra âm thanh")

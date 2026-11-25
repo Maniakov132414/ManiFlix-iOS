@@ -603,6 +603,23 @@ final class PlayerEngine: NSObject, ObservableObject {
         if isPlaying {
             player.pause()
             isPlaying = false
+            if currentTime > 5 && duration > 10 {
+                let epName = currentEpisode?.name ?? "Tập \(episodeIndex + 1)"
+                let cur = currentTime
+                let dur = duration
+                Task {
+                    await AppState.shared.recordProgress(
+                        movie: movie,
+                        episodeIndex: episodeIndex,
+                        episodeName: epName,
+                        currentTime: cur,
+                        duration: dur,
+                        forceWidgetSync: true
+                    )
+                }
+            } else {
+                WidgetSyncBridge.shared.syncFromCurrentState(force: true)
+            }
         } else {
             player.play()
             player.rate = playbackRate
@@ -717,7 +734,8 @@ final class PlayerEngine: NSObject, ObservableObject {
                     episodeIndex: episodeIndex,
                     episodeName: epName,
                     currentTime: cur,
-                    duration: dur
+                    duration: dur,
+                    forceWidgetSync: true
                 )
             }
         }

@@ -60,7 +60,10 @@ final class AppState: ObservableObject {
     }
 
     func bootstrapSession() async {
-        guard !authToken.isEmpty else { return }
+        guard !authToken.isEmpty else {
+            WidgetSyncBridge.shared.syncFromCurrentState(force: true)
+            return
+        }
         do {
             let me = try await ManiFlixAPI.shared.fetchMe(token: authToken)
             self.currentUser = me.user
@@ -72,11 +75,15 @@ final class AppState: ObservableObject {
             if case APIError.badStatus(let code, _) = error, code == 401 {
                 logout()
             }
+            WidgetSyncBridge.shared.syncFromCurrentState(force: true)
         }
     }
 
     func refreshLibrary() async {
-        guard !authToken.isEmpty else { return }
+        guard !authToken.isEmpty else {
+            WidgetSyncBridge.shared.syncFromCurrentState(force: true)
+            return
+        }
         async let histTask = ManiFlixAPI.shared.fetchHistory(token: authToken)
         async let favTask = ManiFlixAPI.shared.fetchFavorites(token: authToken)
         if let h = try? await histTask, let serverHist = h.history {
@@ -84,6 +91,7 @@ final class AppState: ObservableObject {
             persistLocalHistory()
         }
         if let f = try? await favTask { self.favorites = f.favorites ?? [] }
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
     }
 
     func handleAuthSuccess(token: String, user: UserInfo?) async {
@@ -144,6 +152,7 @@ final class AppState: ObservableObject {
             let res = try await ManiFlixAPI.shared.toggleFavorite(token: authToken, movie: movie)
             if let list = res.favorites {
                 self.favorites = list
+                WidgetSyncBridge.shared.syncFromCurrentState(force: true)
             } else {
                 await refreshLibrary()
             }
@@ -163,6 +172,7 @@ final class AppState: ObservableObject {
             let res = try await ManiFlixAPI.shared.toggleFavoriteItem(token: authToken, item: item)
             if let list = res.favorites {
                 self.favorites = list
+                WidgetSyncBridge.shared.syncFromCurrentState(force: true)
             } else {
                 await refreshLibrary()
             }
@@ -176,6 +186,7 @@ final class AppState: ObservableObject {
     func likeMovie(_ item: MovieItem) {
         likedSlugs.insert(item.slug)
         UserDefaults.standard.set(Array(likedSlugs), forKey: likedKey)
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
         Haptics.impact(.light)
         showBanner("Đã thích: sẽ gợi ý thêm phim tương tự")
     }
@@ -183,6 +194,7 @@ final class AppState: ObservableObject {
     func dislikeMovie(_ item: MovieItem) {
         likedSlugs.remove(item.slug)
         UserDefaults.standard.set(Array(likedSlugs), forKey: likedKey)
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
         Haptics.impact(.light)
         showBanner("Đã ghi nhận: giảm bớt phim tương tự")
     }
@@ -192,6 +204,7 @@ final class AppState: ObservableObject {
         let rec = BlockedMovieRecord(slug: item.slug, name: item.name, poster: item.poster_url ?? item.thumb_url)
         blockedMovies.insert(rec, at: 0)
         persistBlocked()
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
         Haptics.notify(.warning)
         showBanner("Đã ẩn \"\(item.name)\" khỏi đề xuất")
     }
@@ -199,6 +212,7 @@ final class AppState: ObservableObject {
     func unblockMovie(slug: String) {
         blockedMovies.removeAll(where: { $0.slug == slug })
         persistBlocked()
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
         Haptics.impact(.light)
         showBanner("Đã bỏ ẩn phim")
     }
@@ -274,7 +288,7 @@ final class AppState: ObservableObject {
         return 0
     }
 
-    func recordProgress(movie: MovieDetail, episodeIndex: Int, episodeName: String, currentTime: Double, duration: Double) async {
+    func recordProgress(movie: MovieDetail, episodeIndex: Int, episodeName: String, currentTime: Double, duration: Double, forceWidgetSync: Bool = false) async {
         let localEntry = HistoryEntry(
             slug: movie.slug,
             name: movie.name,
@@ -288,6 +302,7 @@ final class AppState: ObservableObject {
         history.removeAll(where: { $0.slug == movie.slug })
         history.insert(localEntry, at: 0)
         persistLocalHistory()
+        WidgetSyncBridge.shared.syncFromCurrentState(force: forceWidgetSync)
 
         guard !authToken.isEmpty else { return }
         await ManiFlixAPI.shared.saveHistory(
@@ -305,6 +320,7 @@ final class AppState: ObservableObject {
     func deleteHistory(slug: String) async {
         history.removeAll(where: { $0.slug == slug })
         persistLocalHistory()
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
         guard !authToken.isEmpty else { return }
         await ManiFlixAPI.shared.deleteHistory(token: authToken, slug: slug)
         showBanner("Đã xoá khỏi lịch sử xem")
@@ -356,6 +372,7 @@ final class AppState: ObservableObject {
         isPlayerPresented = false
         activeEngine?.shutdown()
         activeEngine = nil
+        WidgetSyncBridge.shared.syncFromCurrentState(force: true)
     }
 }
 

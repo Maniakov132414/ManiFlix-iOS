@@ -51,6 +51,12 @@ struct ManiFlixApp: App {
             let slug = url.lastPathComponent
             if !slug.isEmpty && slug != "movie" {
                 appState.deepLinkSlug = slug
+                let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                if comps?.queryItems?.contains(where: { $0.name == "resume" && $0.value == "1" }) == true {
+                    Task {
+                        await appState.quickWatch(slug: slug)
+                    }
+                }
             }
         }
     }

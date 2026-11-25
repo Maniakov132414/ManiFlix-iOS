@@ -138,6 +138,24 @@ enum ExternalPlayerOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum WidgetFeedMode: String, CaseIterable, Identifiable {
+    case smart
+    case continueWatching
+    case forYou
+    case latest
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .smart: return "Thông minh (Xem tiếp + Đề xuất)"
+        case .continueWatching: return "Đang xem gần đây"
+        case .forYou: return "Đề xuất cho bạn"
+        case .latest: return "Phim mới cập nhật"
+        }
+    }
+}
+
 final class AppPreferences: ObservableObject {
     static let shared = AppPreferences()
     private let defaults = UserDefaults.standard
@@ -260,6 +278,14 @@ final class AppPreferences: ObservableObject {
     @Published var externalPlayer: ExternalPlayerOption {
         didSet { defaults.set(externalPlayer.rawValue, forKey: "pref.externalPlayer") }
     }
+    @Published var widgetFeedMode: WidgetFeedMode {
+        didSet {
+            defaults.set(widgetFeedMode.rawValue, forKey: "pref.widgetFeedMode")
+            Task { @MainActor in
+                WidgetSyncBridge.shared.syncFromCurrentState(force: true)
+            }
+        }
+    }
 
     private init() {
         let ud = UserDefaults.standard
@@ -318,6 +344,7 @@ final class AppPreferences: ObservableObject {
         self.introSkipBehavior = IntroSkipBehavior(rawValue: ud.string(forKey: "pref.introSkipBehavior") ?? "") ?? .button
         self.autoNextEpisode = ud.object(forKey: "pref.autoNextEpisode") as? Bool ?? true
         self.externalPlayer = ExternalPlayerOption(rawValue: ud.string(forKey: "pref.externalPlayer") ?? "") ?? .internalPlayer
+        self.widgetFeedMode = WidgetFeedMode(rawValue: ud.string(forKey: "pref.widgetFeedMode") ?? "") ?? .smart
     }
 
     var normalizedBaseURL: String {
@@ -445,5 +472,6 @@ final class AppPreferences: ObservableObject {
         introSkipBehavior = .button
         autoNextEpisode = true
         externalPlayer = .internalPlayer
+        widgetFeedMode = .smart
     }
 }
