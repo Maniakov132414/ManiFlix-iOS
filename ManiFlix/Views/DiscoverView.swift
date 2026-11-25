@@ -169,14 +169,35 @@ struct DiscoverView: View {
                         if selectedCategory == .all {
                             if !visibleHero.isEmpty {
                                 let featured = Array(visibleHero.prefix(5))
-                                TabView(selection: $heroSelection) {
-                                    ForEach(Array(featured.enumerated()), id: \.element.id) { idx, movie in
-                                        heroCard(for: movie)
-                                            .tag(idx)
+                                VStack(spacing: 10) {
+                                    TabView(selection: $heroSelection) {
+                                        ForEach(Array(featured.enumerated()), id: \.element.id) { idx, movie in
+                                            heroCard(for: movie)
+                                                .tag(idx)
+                                        }
+                                    }
+                                    .frame(height: 296)
+                                    .tabViewStyle(.page(indexDisplayMode: .never))
+
+                                    if featured.count > 1 {
+                                        HStack(spacing: 6) {
+                                            ForEach(0..<featured.count, id: \.self) { idx in
+                                                Button {
+                                                    withAnimation(.easeInOut(duration: 0.22)) {
+                                                        heroSelection = idx
+                                                    }
+                                                } label: {
+                                                    Capsule()
+                                                        .fill(idx == heroSelection ? prefs.currentAccentColor : ManiFlixTheme.secondaryText(colorScheme).opacity(0.36))
+                                                        .frame(width: idx == heroSelection ? 18 : 6, height: 6)
+                                                        .animation(.easeInOut(duration: 0.2), value: heroSelection)
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity)
                                     }
                                 }
-                                .frame(height: 312)
-                                .tabViewStyle(.page(indexDisplayMode: .automatic))
                             } else if isLoading {
                                 RoundedRectangle(cornerRadius: 16)
                                     .fill(ManiFlixTheme.cardFill(colorScheme))
