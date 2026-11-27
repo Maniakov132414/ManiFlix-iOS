@@ -40,6 +40,11 @@ enum PlayerAspectMode: String, CaseIterable {
     }
 }
 
+struct SubtitleTrackOption: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
+
 @MainActor
 final class PlayerEngine: NSObject, ObservableObject {
     @Published var movie: MovieDetail
@@ -68,6 +73,9 @@ final class PlayerEngine: NSObject, ObservableObject {
     @Published var videoGravity: AVLayerVideoGravity = .resizeAspect
     @Published var flipHorizontal: Bool = false
     @Published var flipVertical: Bool = false
+    @Published var availableSubtitles: [SubtitleTrackOption] = []
+    @Published var selectedSubtitleId: String = "off"
+    private var subtitleOptionsMap: [String: AVMediaSelectionOption] = [:]
     var closingExplicitly: Bool = false
 
     let player = AVPlayer()
@@ -249,7 +257,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         activeStreamURL = url.absoluteString
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": [
-                "User-Agent": "ManiFlix/1.2.0 (iPhone; iOS 18.0)"
+                "User-Agent": "ManiFlix/1.2.1 (iPhone; iOS 18.0)"
             ]
         ])
         let item = AVPlayerItem(asset: asset)
@@ -302,19 +310,42 @@ final class PlayerEngine: NSObject, ObservableObject {
                         self.duration = dur
                     }
                     if let group = observedItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+                        var opts: [SubtitleTrackOption] = []
+                        var map: [String: AVMediaSelectionOption] = [:]
+                        for (idx, opt) in group.options.enumerated() {
+                            let code = (opt.extendedLanguageTag ?? opt.locale?.languageCode ?? "").lowercased()
+                            let rawTitle = opt.displayName
+                            let lower = rawTitle.lowercased()
+                            let isVi = code.hasPrefix("vi") || lower.contains("việt") || lower.contains("viet")
+                            let isEn = code.hasPrefix("en") || lower.contains("english") || lower.contains("anh")
+                            let cleanName = isVi ? "Tiếng Việt" : (isEn ? "English" : rawTitle)
+                            let id = "\(idx)_\(code.isEmpty ? cleanName : code)"
+                            opts.append(SubtitleTrackOption(id: id, name: cleanName))
+                            map[id] = opt
+                        }
+                        let viEn = opts.filter { $0.name == "Tiếng Việt" || $0.name == "English" }
+                        self.availableSubtitles = viEn.isEmpty ? opts : viEn
+                        self.subtitleOptionsMap = map
+
                         let pref = AppPreferences.shared.defaultSubtitleLang.lowercased()
                         if pref == "off" {
                             observedItem.select(nil, in: group)
+                            self.selectedSubtitleId = "off"
                         } else {
-                            let match = group.options.first { opt in
-                                let code = (opt.extendedLanguageTag ?? opt.locale?.languageCode ?? "").lowercased()
-                                let title = opt.displayName.lowercased()
-                                return pref == "en" ? (code.hasPrefix("en") || title.contains("english")) : (code.hasPrefix("vi") || title.contains("việt"))
-                            } ?? group.options.first
-                            if let match = match {
-                                observedItem.select(match, in: group)
+                            let targetName = pref == "en" ? "English" : "Tiếng Việt"
+                            let chosen = self.availableSubtitles.first(where: { $0.name == targetName }) ?? self.availableSubtitles.first
+                            if let chosen = chosen, let avOpt = map[chosen.id] {
+                                observedItem.select(avOpt, in: group)
+                                self.selectedSubtitleId = chosen.id
+                            } else {
+                                observedItem.select(nil, in: group)
+                                self.selectedSubtitleId = "off"
                             }
                         }
+                    } else {
+                        self.availableSubtitles = []
+                        self.subtitleOptionsMap = [:]
+                        self.selectedSubtitleId = "off"
                     }
                     if self.pendingResumeSeconds > 3 {
                         let limit = dur.isFinite ? max(0, dur - 10) : self.pendingResumeSeconds
@@ -381,6 +412,34 @@ final class PlayerEngine: NSObject, ObservableObject {
                     self.nextEpisode()
                 }
             }
+        }
+    }
+
+    var currentSubtitleShortLabel: String {
+        if selectedSubtitleId == "off" { return "Phụ đề" }
+        if let cur = availableSubtitles.first(where: { $0.id == selectedSubtitleId }) {
+            if cur.name == "Tiếng Việt" { return "VI" }
+            if cur.name == "English" { return "EN" }
+            return cur.name
+        }
+        return "Phụ đề"
+    }
+
+    func selectSubtitle(id: String) {
+        guard let item = player.currentItem,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+            showToast("Tập này không có phụ đề rời")
+            return
+        }
+        if id == "off" {
+            item.select(nil, in: group)
+            selectedSubtitleId = "off"
+            showToast("Đã tắt phụ đề")
+        } else if let avOpt = subtitleOptionsMap[id] {
+            item.select(avOpt, in: group)
+            selectedSubtitleId = id
+            let label = availableSubtitles.first(where: { $0.id == id })?.name ?? "Phụ đề"
+            showToast("Phụ đề: \(label)")
         }
     }
 

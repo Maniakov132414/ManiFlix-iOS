@@ -756,6 +756,48 @@ struct ManiFlixPlayerView: View {
 
                     Spacer()
 
+                    Menu {
+                        if engine.availableSubtitles.isEmpty {
+                            Text("Không có phụ đề rời")
+                        } else {
+                            ForEach(engine.availableSubtitles) { sub in
+                                Button {
+                                    engine.selectSubtitle(id: sub.id)
+                                    scheduleAutoHide()
+                                } label: {
+                                    HStack {
+                                        Text(sub.name)
+                                        if engine.selectedSubtitleId == sub.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                            Divider()
+                            Button {
+                                engine.selectSubtitle(id: "off")
+                                scheduleAutoHide()
+                            } label: {
+                                HStack {
+                                    Text("Tắt phụ đề")
+                                    if engine.selectedSubtitleId == "off" {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: engine.selectedSubtitleId == "off" ? "captions.bubble" : "captions.bubble.fill")
+                            Text(engine.currentSubtitleShortLabel)
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .frame(height: 32)
+                    }
+                    .adaptiveGlassCapsule()
+
                     Button {
                         engine.cycleAspectMode()
                         scheduleAutoHide()
