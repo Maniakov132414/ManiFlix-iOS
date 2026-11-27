@@ -47,21 +47,33 @@ struct MoviePosterCard: View {
                 CachedAsyncImage(url: movie.displayPosterURL)
                     .frame(maxWidth: .infinity)
                     .aspectRatio(2.0 / 3.0, contentMode: .fill)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(ManiFlixTheme.cardStroke(colorScheme), lineWidth: 0.5)
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.32), ManiFlixTheme.cardStroke(colorScheme), Color.white.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.85
+                            )
                     )
 
                 if let badge = movie.quality ?? movie.episode_current, !badge.isEmpty {
+                    let is4k = badge.localizedCaseInsensitiveContains("4k") || badge.contains("2160")
                     Text(badge)
-                        .font(.system(size: 9.5, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(is4k ? Color(red: 0.04, green: 0.05, blue: 0.09) : .white)
+                        .padding(.horizontal, 6.5)
                         .padding(.vertical, 2.5)
-                        .background(Color.black.opacity(0.72))
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        .padding(6)
+                        .background(
+                            is4k
+                                ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "#FBBF24"), Color(hex: "#D97706")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                : AnyShapeStyle(Color.black.opacity(0.74))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .padding(7)
                 }
             }
 
@@ -338,32 +350,40 @@ struct DiscoverView: View {
             }
             .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("PHIM MỚI • \(yearText)")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.8)
-                    .foregroundColor(.white.opacity(0.85))
-
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 6) {
                     if let q = movie.quality, !q.isEmpty {
-                        Text(q)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(prefs.currentAccentColor.opacity(0.9))
-                            .cornerRadius(4)
+                        let is4k = q.localizedCaseInsensitiveContains("4k") || q.contains("2160")
+                        Text(is4k ? "4K Ultra HD" : q)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(is4k ? Color(red: 0.04, green: 0.05, blue: 0.09) : .white)
+                            .padding(.horizontal, 8.5)
+                            .padding(.vertical, 3)
+                            .background(
+                                is4k
+                                    ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "#FBBF24"), Color(hex: "#D97706")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    : AnyShapeStyle(prefs.currentAccentColor.opacity(0.92))
+                            )
+                            .clipShape(Capsule())
                     }
                     if let lang = movie.lang, !lang.isEmpty {
                         Text(lang)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color(white: 0.88))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Color(red: 0.43, green: 0.91, blue: 0.72))
+                            .padding(.horizontal, 8.5)
+                            .padding(.vertical, 3)
+                            .background(Color(red: 0.06, green: 0.73, blue: 0.51).opacity(0.22))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().strokeBorder(Color(red: 0.20, green: 0.83, blue: 0.60).opacity(0.45), lineWidth: 0.6))
                     }
-                    if let ep = movie.episode_current, !ep.isEmpty {
-                        Text("• \(ep)")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(white: 0.72))
-                    }
+                    Text(yearText)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color(white: 0.92))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.15))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.6))
                 }
 
                 Text(movie.name)
