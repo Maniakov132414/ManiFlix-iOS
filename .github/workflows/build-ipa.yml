@@ -204,7 +204,7 @@ jobs:
           body: |
             ## ManiFlix 2.0.0
             - Chọn ngôn ngữ lần đầu mở app (Tiếng Việt / English) và tự động cấu hình phụ đề mặc định tương ứng.
-            - Thêm cài đặt Ngôn ngữ ứng dụng & Phụ đề mặc định (Tiếng Việt / English / Tắt), tự chọn phụ đề `.vtt` từ VSMov khi phát phim và tối ưu failover stream.
+            - Cài đặt chia tab mới (Ngôn ngữ & Phụ đề / Chủ đề / Tiện ích), nút chọn phụ đề trực tiếp trên trình phát, đồng bộ 6 chủ đề và tăng tốc khởi phát phim không quảng cáo.
             - **Link Repo**: `https://phim.maniakov.bond/repo.json`
           files: dist/*.ipa
           overwrite_files: true
