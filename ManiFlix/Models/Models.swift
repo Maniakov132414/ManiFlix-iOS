@@ -105,6 +105,7 @@ struct MovieItem: Codable, Identifiable, Hashable {
     let type: String?
     let quality: String?
     let lang: String?
+    let sub_langs: [String]?
     let episode_current: String?
     let time: String?
     let category: [MovieTag]?

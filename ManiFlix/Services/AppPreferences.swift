@@ -39,11 +39,12 @@ struct ThemePreset: Identifiable, Hashable {
     let surfaceHex: String
 
     static let presets: [ThemePreset] = [
-        ThemePreset(id: "apple-dark", name: "Apple Music Tối", mode: .dark, accentHex: "#FA2D48", bgHex: "#121214", surfaceHex: "#1C1C1E"),
-        ThemePreset(id: "pure-light", name: "Trắng Tinh Khôi", mode: .light, accentHex: "#FA2D48", bgHex: "#F4F4F7", surfaceHex: "#FFFFFF"),
-        ThemePreset(id: "midnight-indigo", name: "Midnight Indigo", mode: .custom, accentHex: "#5E5CE6", bgHex: "#0B1020", surfaceHex: "#151C32"),
-        ThemePreset(id: "forest-emerald", name: "Forest Emerald", mode: .custom, accentHex: "#30D158", bgHex: "#0B1612", surfaceHex: "#14241D"),
-        ThemePreset(id: "cyberpunk-rose", name: "Cyberpunk Rose", mode: .custom, accentHex: "#FF2D55", bgHex: "#16091A", surfaceHex: "#26112E")
+        ThemePreset(id: "crimson_violet", name: "ManiFlix Mặc Định", mode: .dark, accentHex: "#e11d48", bgHex: "#0b0f19", surfaceHex: "#0f172a"),
+        ThemePreset(id: "netflix_oled", name: "Rạp Đen OLED", mode: .oled, accentHex: "#e50914", bgHex: "#050507", surfaceHex: "#0d0d12"),
+        ThemePreset(id: "midnight_indigo", name: "Đêm Xanh Indigo", mode: .custom, accentHex: "#5e5ce6", bgHex: "#0b1020", surfaceHex: "#151c32"),
+        ThemePreset(id: "emerald_aurora", name: "Lục Bảo Cực Quang", mode: .custom, accentHex: "#10b981", bgHex: "#06120f", surfaceHex: "#0b1d19"),
+        ThemePreset(id: "cyber_rose", name: "Cyberpunk Rose", mode: .custom, accentHex: "#ff2d55", bgHex: "#140818", surfaceHex: "#221029"),
+        ThemePreset(id: "pure_light", name: "Trắng Tinh Khôi", mode: .light, accentHex: "#e11d48", bgHex: "#f4f5f8", surfaceHex: "#ffffff")
     ]
 }
 
@@ -286,6 +287,19 @@ final class AppPreferences: ObservableObject {
             }
         }
     }
+    @Published var uiLanguage: String {
+        didSet { defaults.set(uiLanguage, forKey: "pref.uiLanguage") }
+    }
+    @Published var defaultSubtitleLang: String {
+        didSet { defaults.set(defaultSubtitleLang, forKey: "pref.defaultSubtitleLang") }
+    }
+    @Published var hasCompletedLanguageSetup: Bool {
+        didSet { defaults.set(hasCompletedLanguageSetup, forKey: "pref.hasCompletedLanguageSetup") }
+    }
+
+    func tr(_ vi: String, _ en: String) -> String {
+        uiLanguage == "en" ? en : vi
+    }
 
     private init() {
         let ud = UserDefaults.standard
@@ -345,6 +359,11 @@ final class AppPreferences: ObservableObject {
         self.autoNextEpisode = ud.object(forKey: "pref.autoNextEpisode") as? Bool ?? true
         self.externalPlayer = ExternalPlayerOption(rawValue: ud.string(forKey: "pref.externalPlayer") ?? "") ?? .internalPlayer
         self.widgetFeedMode = WidgetFeedMode(rawValue: ud.string(forKey: "pref.widgetFeedMode") ?? "") ?? .smart
+        let savedLang = ud.string(forKey: "pref.uiLanguage") ?? "vi"
+        self.uiLanguage = savedLang == "en" ? "en" : "vi"
+        let savedSub = ud.string(forKey: "pref.defaultSubtitleLang") ?? "vi"
+        self.defaultSubtitleLang = (savedSub == "en" || savedSub == "off") ? savedSub : "vi"
+        self.hasCompletedLanguageSetup = ud.bool(forKey: "pref.hasCompletedLanguageSetup")
     }
 
     var normalizedBaseURL: String {

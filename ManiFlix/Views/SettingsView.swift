@@ -9,7 +9,19 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Tài khoản") {
+            Section(prefs.tr("Ngôn ngữ & Phụ đề", "Language & Subtitles")) {
+                Picker(prefs.tr("Ngôn ngữ ứng dụng", "App Language"), selection: $prefs.uiLanguage) {
+                    Text("Tiếng Việt").tag("vi")
+                    Text("English").tag("en")
+                }
+                Picker(prefs.tr("Phụ đề mặc định", "Default Subtitle"), selection: $prefs.defaultSubtitleLang) {
+                    Text("Tiếng Việt").tag("vi")
+                    Text("English").tag("en")
+                    Text(prefs.tr("Tắt phụ đề", "Off")).tag("off")
+                }
+            }
+
+            Section(prefs.tr("Tài khoản", "Account")) {
                 if appState.isLoggedIn, let user = appState.currentUser {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {

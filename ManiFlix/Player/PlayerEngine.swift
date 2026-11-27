@@ -226,10 +226,14 @@ final class PlayerEngine: NSObject, ObservableObject {
             return
         }
 
+        let isVsmov = rawM3U8.contains("#vsmov.m3u8")
         let resolvedURL: URL?
         if useClean, let clean = ManiFlixAPI.shared.cleanM3U8URL(from: rawM3U8) {
             resolvedURL = clean
             currentSourceLabel = "Chuẩn"
+        } else if isVsmov {
+            resolvedURL = ManiFlixAPI.shared.cleanM3U8URL(from: rawM3U8, extraParams: ["ap": "1"])
+            currentSourceLabel = "Dự phòng (Proxy)"
         } else {
             resolvedURL = URL(string: rawM3U8)
             currentSourceLabel = "Dự phòng"
@@ -245,7 +249,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         activeStreamURL = url.absoluteString
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": [
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15"
+                "User-Agent": "ManiFlix/1.2.0 (iPhone; iOS 18.0)"
             ]
         ])
         let item = AVPlayerItem(asset: asset)
@@ -264,7 +268,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     private func scheduleFailoverWatchdog(for ep: EpisodeItem) {
         stallTimer?.cancel()
         stallTimer = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 8_500_000_000)
+            try? await Task.sleep(nanoseconds: 18_000_000_000)
             guard !Task.isCancelled, let self = self else { return }
             if self.isBuffering && self.currentTime < 0.5 && !self.didFailoverThisEpisode {
                 self.tryFailoverStream(for: ep, reason: "Đang đổi sang nguồn dự phòng...")
@@ -296,6 +300,21 @@ final class PlayerEngine: NSObject, ObservableObject {
                     let dur = observedItem.duration.seconds
                     if dur.isFinite && dur > 0 {
                         self.duration = dur
+                    }
+                    if let group = observedItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+                        let pref = AppPreferences.shared.defaultSubtitleLang.lowercased()
+                        if pref == "off" {
+                            observedItem.select(nil, in: group)
+                        } else {
+                            let match = group.options.first { opt in
+                                let code = (opt.extendedLanguageTag ?? opt.locale?.languageCode ?? "").lowercased()
+                                let title = opt.displayName.lowercased()
+                                return pref == "en" ? (code.hasPrefix("en") || title.contains("english")) : (code.hasPrefix("vi") || title.contains("việt"))
+                            } ?? group.options.first
+                            if let match = match {
+                                observedItem.select(match, in: group)
+                            }
+                        }
                     }
                     if self.pendingResumeSeconds > 3 {
                         let limit = dur.isFinite ? max(0, dur - 10) : self.pendingResumeSeconds

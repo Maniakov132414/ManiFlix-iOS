@@ -37,6 +37,12 @@ struct ManiFlixApp: App {
                 .sheet(isPresented: $appState.showAuthSheet) {
                     AuthSheetView()
                 }
+                .sheet(isPresented: Binding(
+                    get: { !prefs.hasCompletedLanguageSetup },
+                    set: { if !$0 { prefs.hasCompletedLanguageSetup = true } }
+                )) {
+                    LanguageOnboardingSheet()
+                }
                 .sheet(isPresented: $updates.showSoftPrompt) {
                     UpdatePromptView(isForced: false)
                 }
@@ -58,6 +64,67 @@ struct ManiFlixApp: App {
                     }
                 }
             }
+        }
+    }
+}
+
+struct LanguageOnboardingSheet: View {
+    @ObservedObject private var prefs = AppPreferences.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Chọn ngôn ngữ / Choose Language")
+                    .font(.title2.weight(.bold))
+                Text("Lựa chọn sẽ tự động thiết lập ngôn ngữ giao diện và phụ đề mặc định khi phát phim.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Button {
+                    prefs.uiLanguage = "vi"
+                    prefs.defaultSubtitleLang = "vi"
+                    prefs.hasCompletedLanguageSetup = true
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Tiếng Việt").font(.headline)
+                            Text("Giao diện Tiếng Việt • Phụ đề mặc định: Tiếng Việt").font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill").foregroundColor(prefs.currentAccentColor)
+                    }
+                    .padding(14)
+                    .background(Color.secondary.opacity(0.12))
+                    .cornerRadius(14)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    prefs.uiLanguage = "en"
+                    prefs.defaultSubtitleLang = "en"
+                    prefs.hasCompletedLanguageSetup = true
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("English").font(.headline)
+                            Text("English Interface • Default Subtitle: English").font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "globe").foregroundColor(prefs.currentAccentColor)
+                    }
+                    .padding(14)
+                    .background(Color.secondary.opacity(0.12))
+                    .cornerRadius(14)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+            }
+            .padding(22)
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
