@@ -257,7 +257,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         activeStreamURL = url.absoluteString
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": [
-                "User-Agent": "ManiFlix/1.2.1 (iPhone; iOS 18.0)"
+                "User-Agent": "ManiFlix/2.0.0 (iPhone; iOS 18.0)"
             ]
         ])
         let item = AVPlayerItem(asset: asset)
