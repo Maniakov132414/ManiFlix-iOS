@@ -96,6 +96,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     private var remoteCommandsConfigured = false
     private var usingCleanSource = true
     private var didFailoverThisEpisode = false
+    private var triedServerIndices: Set<Int> = []
     private var lastSavedProgressTimestamp: Double = -999
     private var skippedCutIds = Set<String>()
     private var dismissedSkipIds = Set<String>()
@@ -190,8 +191,11 @@ final class PlayerEngine: NSObject, ObservableObject {
         }
     }
 
-    func loadCurrentEpisode() {
+    func loadCurrentEpisode(resetFailover: Bool = true) {
         cleanupObservers()
+        if resetFailover {
+            triedServerIndices = [serverIndex]
+        }
         isFailed = false
         errorMessage = ""
         isBuffering = true
@@ -231,11 +235,13 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     private func startPlaybackStream(for ep: EpisodeItem, useClean: Bool) {
+        cleanupObservers()
+        isFailed = false
+        isBuffering = true
         let rawM3U8 = ep.link_m3u8?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !rawM3U8.isEmpty else {
-            isFailed = true
-            isBuffering = false
-            errorMessage = "Tập này chưa có luồng phát HLS."
+            didFailoverThisEpisode = true
+            tryFailoverStream(for: ep, reason: "Tập này chưa có luồng phát HLS.")
             return
         }
 
@@ -253,16 +259,15 @@ final class PlayerEngine: NSObject, ObservableObject {
         }
 
         guard let url = resolvedURL else {
-            isFailed = true
-            isBuffering = false
-            errorMessage = "Địa chỉ luồng phát không hợp lệ."
+            didFailoverThisEpisode = true
+            tryFailoverStream(for: ep, reason: "Địa chỉ luồng phát không hợp lệ.")
             return
         }
 
         activeStreamURL = url.absoluteString
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": [
-                "User-Agent": "ManiFlix/2.0.2 (iPhone; iOS 18.0)"
+                "User-Agent": "ManiFlix/2.0.3 (iPhone; iOS 18.0)"
             ]
         ])
         let item = AVPlayerItem(asset: asset)
@@ -285,23 +290,47 @@ final class PlayerEngine: NSObject, ObservableObject {
         stallTimer = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 18_000_000_000)
             guard !Task.isCancelled, let self = self else { return }
-            if self.isBuffering && self.currentTime < 0.5 && !self.didFailoverThisEpisode {
+            if self.isBuffering && self.currentTime < 0.5 {
                 self.tryFailoverStream(for: ep, reason: "Đang đổi sang nguồn dự phòng...")
             }
         }
     }
 
     private func tryFailoverStream(for ep: EpisodeItem, reason: String) {
-        guard !didFailoverThisEpisode else {
-            isFailed = true
-            isBuffering = false
-            errorMessage = reason
+        triedServerIndices.insert(serverIndex)
+        let rawM3U8 = ep.link_m3u8?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !didFailoverThisEpisode && !rawM3U8.contains("/api/") {
+            didFailoverThisEpisode = true
+            usingCleanSource.toggle()
+            showToast(usingCleanSource ? "Đổi sang nguồn lọc quảng cáo" : "Đổi sang nguồn gốc")
+            startPlaybackStream(for: ep, useClean: usingCleanSource)
             return
         }
-        didFailoverThisEpisode = true
-        usingCleanSource.toggle()
-        showToast(usingCleanSource ? "Đổi sang nguồn lọc quảng cáo" : "Đổi sang nguồn gốc")
-        startPlaybackStream(for: ep, useClean: usingCleanSource)
+
+        let targetSlug = ep.slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        for nextIdx in servers.indices where !triedServerIndices.contains(nextIdx) {
+            let candidateList = servers[nextIdx].server_data
+            guard !candidateList.isEmpty else { continue }
+            let nextEpIdx: Int
+            if !targetSlug.isEmpty,
+               let matchedIdx = candidateList.firstIndex(where: { $0.slug.trimmingCharacters(in: .whitespacesAndNewlines) == targetSlug }) {
+                nextEpIdx = matchedIdx
+            } else {
+                nextEpIdx = min(max(0, episodeIndex), candidateList.count - 1)
+            }
+            triedServerIndices.insert(nextIdx)
+            serverIndex = nextIdx
+            episodeIndex = nextEpIdx
+            didFailoverThisEpisode = false
+            usingCleanSource = true
+            showToast("Đang chuyển sang \(servers[nextIdx].server_name)...")
+            startPlaybackStream(for: candidateList[nextEpIdx], useClean: true)
+            return
+        }
+
+        isFailed = true
+        isBuffering = false
+        errorMessage = reason
     }
 
     private func attachItemObservers(item: AVPlayerItem) {
@@ -786,7 +815,13 @@ final class PlayerEngine: NSObject, ObservableObject {
         serverIndex = serverIdx
         episodeIndex = epIdx
         pendingResumeSeconds = AppState.shared.savedResumeTime(slug: movie.slug, episodeIndex: epIdx)
-        loadCurrentEpisode()
+        loadCurrentEpisode(resetFailover: true)
+    }
+
+    func selectServer(_ idx: Int) {
+        guard let srv = servers[safe: idx], !srv.server_data.isEmpty else { return }
+        let targetEpIdx = min(max(0, episodeIndex), srv.server_data.count - 1)
+        selectEpisode(serverIdx: idx, epIdx: targetEpIdx)
     }
 
     func previousEpisode() {

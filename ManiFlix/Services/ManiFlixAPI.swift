@@ -134,7 +134,7 @@ final class ManiFlixAPI {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("ManiFlix/2.0.2", forHTTPHeaderField: "User-Agent")
+        req.setValue("ManiFlix/2.0.3", forHTTPHeaderField: "User-Agent")
         if forceRefresh {
             req.cachePolicy = .reloadIgnoringLocalCacheData
         }
