@@ -262,11 +262,13 @@ final class PlayerEngine: NSObject, ObservableObject {
         activeStreamURL = url.absoluteString
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetHTTPHeaderFieldsKey": [
-                "User-Agent": "ManiFlix/2.0.0 (iPhone; iOS 18.0)"
+                "User-Agent": "ManiFlix/2.0.2 (iPhone; iOS 18.0)"
             ]
         ])
         let item = AVPlayerItem(asset: asset)
         AudioSpatialEngine.shared.applySettings(to: item, player: player)
+        item.preferredForwardBufferDuration = 12
+        player.automaticallyWaitsToMinimizeStalling = true
 
         player.replaceCurrentItem(with: item)
         attachItemObservers(item: item)
@@ -712,7 +714,8 @@ final class PlayerEngine: NSObject, ObservableObject {
     func seek(to seconds: Double, programmatic: Bool = false) {
         let clamped = max(0, min(seconds, duration > 0 ? duration : seconds))
         let cm = CMTime(seconds: clamped, preferredTimescale: 600)
-        player.seek(to: cm, toleranceBefore: .zero, toleranceAfter: .zero)
+        let tolerance = CMTime(seconds: 0.35, preferredTimescale: 600)
+        player.seek(to: cm, toleranceBefore: tolerance, toleranceAfter: tolerance)
         currentTime = clamped
         if !programmatic {
             for marker in filteredTimelineMarkers {

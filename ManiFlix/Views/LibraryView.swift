@@ -88,7 +88,7 @@ struct LibraryView: View {
                     ForEach(appState.history) { entry in
                         NavigationLink(destination: MovieDetailView(slug: entry.slug, seedMovie: nil)) {
                             HStack(spacing: 12) {
-                                CachedAsyncImage(url: entry.displayPosterURL)
+                                CachedPosterImage(url: entry.displayPosterURL, maxPixelSize: 240)
                                     .frame(width: 96, height: 58)
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                     .overlay(
@@ -203,7 +203,7 @@ struct LibraryView: View {
                         HStack(spacing: 12) {
                             NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: nil)) {
                                 HStack(spacing: 12) {
-                                    CachedAsyncImage(url: ImageURLResolver.resolve(item.poster), maxPixelSize: 240)
+                                    CachedPosterImage(url: ImageURLResolver.resolve(item.poster), maxPixelSize: 240)
                                         .frame(width: 52, height: 74)
                                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                         .overlay(

@@ -59,6 +59,60 @@ final class AppState: ObservableObject {
         !authToken.isEmpty && currentUser != nil
     }
 
+    func fetchBootstrapDiscover(forceRefresh: Bool = false) async throws -> BootstrapDiscoverResponse {
+        let tok = authToken.isEmpty ? nil : authToken
+        if let boot = try? await ManiFlixAPI.shared.fetchBootstrapDiscover(token: tok, forceRefresh: forceRefresh) {
+            let hasAny = !(boot.heroMovies ?? []).isEmpty ||
+                !(boot.seriesMovies ?? []).isEmpty ||
+                !(boot.singleMovies ?? []).isEmpty ||
+                !(boot.animeMovies ?? []).isEmpty
+            if hasAny {
+                if tok != nil {
+                    if let user = boot.user {
+                        self.currentUser = user
+                        if let themeCfg = user.themeConfig {
+                            AppPreferences.shared.applyServerTheme(themeCfg)
+                        }
+                    }
+                    if let serverHist = boot.history {
+                        self.history = serverHist
+                        persistLocalHistory()
+                    }
+                    if let serverFavs = boot.favorites {
+                        self.favorites = serverFavs
+                    }
+                    if boot.history != nil || boot.favorites != nil {
+                        WidgetSyncBridge.shared.syncFromCurrentState(force: false)
+                    }
+                }
+                return boot
+            }
+        }
+
+        // Clean fallback to 4 parallel calls if bootstrap endpoint fails
+        async let latestTask = ManiFlixAPI.shared.fetchMovies(page: 1)
+        async let seriesTask = ManiFlixAPI.shared.fetchCategory(type: "phim-bo", page: 1)
+        async let singleTask = ManiFlixAPI.shared.fetchCategory(type: "phim-le", page: 1)
+        async let animeTask = ManiFlixAPI.shared.fetchCategory(type: "hoat-hinh", page: 1)
+
+        let latest = try await latestTask
+        let series = try? await seriesTask
+        let single = try? await singleTask
+        let anime = try? await animeTask
+
+        return BootstrapDiscoverResponse(
+            status: true,
+            heroMovies: latest.items ?? [],
+            seriesMovies: series?.items ?? [],
+            singleMovies: single?.items ?? [],
+            animeMovies: anime?.items ?? [],
+            user: nil,
+            history: nil,
+            favorites: nil,
+            ts: nil
+        )
+    }
+
     func bootstrapSession() async {
         guard !authToken.isEmpty else {
             WidgetSyncBridge.shared.syncFromCurrentState(force: true)

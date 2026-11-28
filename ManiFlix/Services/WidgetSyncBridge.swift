@@ -110,7 +110,7 @@ final class WidgetSyncBridge {
         req.httpMethod = "POST"
         req.timeoutInterval = 10
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("ManiFlix-iOS/1.1.1", forHTTPHeaderField: "User-Agent")
+        req.setValue("ManiFlix/2.0.2", forHTTPHeaderField: "User-Agent")
         req.httpBody = body
         _ = try? await URLSession.shared.data(for: req)
     }

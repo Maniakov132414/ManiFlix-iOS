@@ -210,7 +210,7 @@ struct RootTabScaffold: View {
                 appState.isPlayerPresented = true
             } label: {
                 HStack(spacing: 11) {
-                    CachedAsyncImage(url: engine.movie.displayPosterURL)
+                    CachedPosterImage(url: engine.movie.displayPosterURL, fallbackURL: engine.movie.displayThumbURL, maxPixelSize: 160)
                         .frame(width: 40, height: 40)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .shadow(color: Color.black.opacity(0.35), radius: 4, x: 0, y: 2)

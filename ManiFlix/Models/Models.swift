@@ -61,6 +61,18 @@ struct MoviesPageResponse: Codable {
     let pagination: PaginationInfo?
 }
 
+struct BootstrapDiscoverResponse: Codable {
+    let status: Bool?
+    let heroMovies: [MovieItem]?
+    let seriesMovies: [MovieItem]?
+    let singleMovies: [MovieItem]?
+    let animeMovies: [MovieItem]?
+    let user: UserInfo?
+    let history: [HistoryEntry]?
+    let favorites: [FavoriteEntry]?
+    let ts: Double?
+}
+
 struct CategoryPageResponse: Codable {
     let status: Bool?
     let titlePage: String?

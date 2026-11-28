@@ -14,15 +14,86 @@ enum APIError: LocalizedError {
     }
 }
 
+actor APIMemoryCache {
+    private struct Entry {
+        let data: Data
+        let expiresAt: Date
+    }
+
+    private var entries: [String: Entry] = [:]
+    private var inflight: [String: Task<Data, Error>] = [:]
+    private let maxEntries = 160
+
+    func get(key: String) -> Data? {
+        guard let item = entries[key] else { return nil }
+        if Date() >= item.expiresAt {
+            entries.removeValue(forKey: key)
+            return nil
+        }
+        return item.data
+    }
+
+    func set(_ data: Data, for key: String, ttl: TimeInterval) {
+        guard ttl > 0 else { return }
+        if entries.count >= maxEntries {
+            let now = Date()
+            entries = entries.filter { $0.value.expiresAt > now }
+            if entries.count >= maxEntries, let oldest = entries.min(by: { $0.value.expiresAt < $1.value.expiresAt })?.key {
+                entries.removeValue(forKey: oldest)
+            }
+        }
+        entries[key] = Entry(data: data, expiresAt: Date().addingTimeInterval(ttl))
+    }
+
+    func fetchCoalesced(
+        key: String,
+        ttl: TimeInterval,
+        forceRefresh: Bool,
+        loader: @escaping @Sendable () async throws -> Data
+    ) async throws -> Data {
+        if !forceRefresh, let hit = get(key: key) {
+            return hit
+        }
+        if !forceRefresh, let existing = inflight[key] {
+            return try await existing.value
+        }
+
+        let task = Task<Data, Error> {
+            try await loader()
+        }
+        inflight[key] = task
+        do {
+            let data = try await task.value
+            inflight.removeValue(forKey: key)
+            if ttl > 0 {
+                set(data, for: key, ttl: ttl)
+            }
+            return data
+        } catch {
+            inflight.removeValue(forKey: key)
+            throw error
+        }
+    }
+}
+
 final class ManiFlixAPI {
     static let shared = ManiFlixAPI()
     private let session: URLSession
     private let decoder = JSONDecoder()
+    private let memoryCache = APIMemoryCache()
 
     private init() {
+        let urlCache = URLCache(
+            memoryCapacity: 64 * 1024 * 1024,
+            diskCapacity: 256 * 1024 * 1024,
+            diskPath: "ManiFlixAPICache"
+        )
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 18
-        config.timeoutIntervalForResource = 35
+        config.urlCache = urlCache
+        config.requestCachePolicy = .useProtocolCachePolicy
+        config.httpMaximumConnectionsPerHost = 12
+        config.timeoutIntervalForRequest = 16
+        config.timeoutIntervalForResource = 32
         self.session = URLSession(configuration: config)
     }
 
@@ -48,7 +119,9 @@ final class ManiFlixAPI {
         method: String = "GET",
         query: [URLQueryItem] = [],
         body: [String: Any]? = nil,
-        token: String? = nil
+        token: String? = nil,
+        cacheTTL: TimeInterval = 0,
+        forceRefresh: Bool = false
     ) async throws -> T {
         guard var comps = URLComponents(string: "\(baseURL)\(path)") else {
             throw APIError.invalidURL
@@ -61,7 +134,10 @@ final class ManiFlixAPI {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("ManiFlix-iOS/1.0.0", forHTTPHeaderField: "User-Agent")
+        req.setValue("ManiFlix/2.0.2", forHTTPHeaderField: "User-Agent")
+        if forceRefresh {
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+        }
 
         if let token = token, !token.isEmpty {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -72,13 +148,32 @@ final class ManiFlixAPI {
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
 
-        let (data, response) = try await session.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.badStatus(0, "Không nhận được phản hồi HTTP")
+        let capturedSession = self.session
+        let capturedReq = req
+        let executeFetch: @Sendable () async throws -> Data = {
+            let (data, response) = try await capturedSession.data(for: capturedReq)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.badStatus(0, "Không nhận được phản hồi HTTP")
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw APIError.badStatus(http.statusCode, msg)
+            }
+            return data
         }
-        guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw APIError.badStatus(http.statusCode, msg)
+
+        let data: Data
+        if method == "GET" && body == nil && cacheTTL > 0 {
+            let tokKey = (token?.isEmpty == false) ? String(token!.hashValue) : "guest"
+            let key = "\(url.absoluteString)|\(tokKey)"
+            data = try await memoryCache.fetchCoalesced(
+                key: key,
+                ttl: cacheTTL,
+                forceRefresh: forceRefresh,
+                loader: executeFetch
+            )
+        } else {
+            data = try await executeFetch()
         }
 
         do {
@@ -88,8 +183,18 @@ final class ManiFlixAPI {
         }
     }
 
+    func fetchBootstrapDiscover(token: String? = nil, forceRefresh: Bool = false) async throws -> BootstrapDiscoverResponse {
+        let ttl: TimeInterval = (token?.isEmpty == false) ? 20 : 60
+        return try await request(
+            path: "/api/bootstrap/discover",
+            token: token,
+            cacheTTL: ttl,
+            forceRefresh: forceRefresh
+        )
+    }
+
     func fetchMovies(page: Int = 1) async throws -> MoviesPageResponse {
-        try await request(path: "/api/movies", query: [URLQueryItem(name: "page", value: "\(page)")])
+        try await request(path: "/api/movies", query: [URLQueryItem(name: "page", value: "\(page)")], cacheTTL: 60)
     }
 
     func fetchCategory(type: String, page: Int = 1) async throws -> CategoryPageResponse {
@@ -98,7 +203,8 @@ final class ManiFlixAPI {
             query: [
                 URLQueryItem(name: "type", value: type),
                 URLQueryItem(name: "page", value: "\(page)")
-            ]
+            ],
+            cacheTTL: 60
         )
     }
 
@@ -108,7 +214,8 @@ final class ManiFlixAPI {
             query: [
                 URLQueryItem(name: "slug", value: slug),
                 URLQueryItem(name: "page", value: "\(page)")
-            ]
+            ],
+            cacheTTL: 60
         )
     }
 
@@ -118,19 +225,21 @@ final class ManiFlixAPI {
             query: [
                 URLQueryItem(name: "q", value: query),
                 URLQueryItem(name: "page", value: "\(page)")
-            ]
+            ],
+            cacheTTL: 60
         )
     }
 
     func fetchMovieDetail(slug: String) async throws -> MovieDetailResponse {
         let encoded = slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? slug
-        return try await request(path: "/api/movie/\(encoded)")
+        return try await request(path: "/api/movie/\(encoded)", cacheTTL: 180)
     }
 
     func fetchFranchise(slug: String) async throws -> FranchiseResponse {
         try await request(
             path: "/api/franchise",
-            query: [URLQueryItem(name: "slug", value: slug)]
+            query: [URLQueryItem(name: "slug", value: slug)],
+            cacheTTL: 180
         )
     }
 
@@ -145,7 +254,8 @@ final class ManiFlixAPI {
         }
         return try await request(
             path: "/api/ads/\(encodedSlug)/\(encodedEp)",
-            query: query
+            query: query,
+            cacheTTL: 180
         )
     }
 

@@ -44,7 +44,7 @@ struct MoviePosterCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .bottomLeading) {
-                CachedAsyncImage(url: movie.displayPosterURL)
+                CachedPosterImage(url: movie.displayPosterURL, fallbackURL: movie.displayThumbURL)
                     .frame(maxWidth: .infinity)
                     .aspectRatio(2.0 / 3.0, contentMode: .fill)
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -278,14 +278,14 @@ struct DiscoverView: View {
         }
         .refreshable {
             if selectedCategory == .all {
-                await loadAll()
+                await loadAll(forceRefresh: true)
             } else {
                 await loadCategoryFeed(for: selectedCategory, reset: true)
             }
         }
         .task {
             if heroMovies.isEmpty {
-                await loadAll()
+                await loadAll(forceRefresh: false)
             }
         }
     }
@@ -331,7 +331,11 @@ struct DiscoverView: View {
         return ZStack(alignment: .bottomLeading) {
             NavigationLink(destination: MovieDetailView(slug: movie.slug, seedMovie: movie)) {
                 ZStack(alignment: .bottomLeading) {
-                    CachedAsyncImage(url: movie.displayThumbURL ?? movie.displayPosterURL, maxPixelSize: 960)
+                    CachedPosterImage(
+                        url: movie.displayThumbURL ?? movie.displayPosterURL,
+                        fallbackURL: movie.displayPosterURL,
+                        maxPixelSize: 960
+                    )
                         .frame(maxWidth: .infinity)
                         .frame(height: heroCardHeight)
                         .clipped()
@@ -483,7 +487,7 @@ struct DiscoverView: View {
                         NavigationLink(destination: MovieDetailView(slug: item.slug, seedMovie: cardItem)) {
                             VStack(alignment: .leading, spacing: 5) {
                                 ZStack(alignment: .bottom) {
-                                    CachedAsyncImage(url: item.displayPosterURL)
+                                    CachedPosterImage(url: item.displayPosterURL, maxPixelSize: 320)
                                         .frame(width: 158, height: 94)
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .overlay(
@@ -611,31 +615,22 @@ struct DiscoverView: View {
         }
     }
 
-    private func loadAll() async {
+    private func loadAll(forceRefresh: Bool = false) async {
         isLoading = true
         errorMsg = nil
         currentPage = 1
         hasMorePages = true
-        async let latestTask = ManiFlixAPI.shared.fetchMovies(page: 1)
-        async let seriesTask = ManiFlixAPI.shared.fetchCategory(type: "phim-bo", page: 1)
-        async let singleTask = ManiFlixAPI.shared.fetchCategory(type: "phim-le", page: 1)
-        async let animeTask = ManiFlixAPI.shared.fetchCategory(type: "hoat-hinh", page: 1)
-
         do {
-            let latest = try await latestTask
-            self.heroMovies = latest.items ?? []
-            if let pag = latest.pagination, let cur = pag.currentPage, let tot = pag.totalPages {
-                self.hasMorePages = cur < tot
-            } else {
-                self.hasMorePages = !(latest.items ?? []).isEmpty
-            }
+            let boot = try await appState.fetchBootstrapDiscover(forceRefresh: forceRefresh)
+            let hero = boot.heroMovies ?? []
+            self.heroMovies = hero
+            self.hasMorePages = hero.count >= 12
+            if let s = boot.seriesMovies, !s.isEmpty { self.seriesMovies = s }
+            if let m = boot.singleMovies, !m.isEmpty { self.singleMovies = m }
+            if let a = boot.animeMovies, !a.isEmpty { self.animeMovies = a }
         } catch {
             self.errorMsg = error.localizedDescription
         }
-
-        if let s = try? await seriesTask { self.seriesMovies = s.items ?? [] }
-        if let m = try? await singleTask { self.singleMovies = m.items ?? [] }
-        if let a = try? await animeTask { self.animeMovies = a.items ?? [] }
         isLoading = false
     }
 

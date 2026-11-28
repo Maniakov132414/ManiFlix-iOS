@@ -156,7 +156,11 @@ struct MovieDetailView: View {
 
     private var headerBanner: some View {
         VStack(spacing: 14) {
-            CachedAsyncImage(url: heroArtworkURL, maxPixelSize: 480)
+            CachedPosterImage(
+                url: heroArtworkURL,
+                fallbackURL: detail?.displayThumbURL ?? seedMovie?.displayThumbURL,
+                maxPixelSize: 480
+            )
                 .frame(width: 158, height: 228)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
@@ -506,11 +510,13 @@ struct MovieDetailView: View {
             let res = try await ManiFlixAPI.shared.fetchMovieDetail(slug: slug)
             self.detail = res.movie
             self.servers = res.episodes ?? []
-            if let fr = try? await ManiFlixAPI.shared.fetchFranchise(slug: slug) {
+            async let franchiseTask = ManiFlixAPI.shared.fetchFranchise(slug: slug)
+            async let relatedTask: Void = loadRelatedMovies(for: res.movie)
+            if let fr = try? await franchiseTask {
                 self.franchiseMeta = fr
                 self.franchiseSeasons = TitleLocalizer.sortFranchiseSeasons(fr.seasons ?? [], baseTitle: fr.baseTitle)
             }
-            await loadRelatedMovies(for: res.movie)
+            _ = await relatedTask
         } catch {
             self.errorMsg = error.localizedDescription
         }

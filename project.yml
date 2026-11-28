@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "2.0.1"
-    CURRENT_PROJECT_VERSION: "201"
+    MARKETING_VERSION: "2.0.2"
+    CURRENT_PROJECT_VERSION: "202"
     GENERATE_INFOPLIST_FILE: "NO"
     APP_BUNDLE_ID: "bond.maniakov.maniflix"
     DEVELOPMENT_TEAM: ""
@@ -34,8 +34,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID)"
         PRODUCT_NAME: ManiFlix
-        MARKETING_VERSION: "2.0.1"
-        CURRENT_PROJECT_VERSION: "201"
+        MARKETING_VERSION: "2.0.2"
+        CURRENT_PROJECT_VERSION: "202"
         GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: ManiFlix/Info.plist
         LD_RUNPATH_SEARCH_PATHS:
@@ -56,8 +56,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID).widgets"
         PRODUCT_NAME: ManiFlixWidgets
-        MARKETING_VERSION: "2.0.1"
-        CURRENT_PROJECT_VERSION: "201"
+        MARKETING_VERSION: "2.0.2"
+        CURRENT_PROJECT_VERSION: "202"
         GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: ManiFlixWidgets/Info.plist
         SKIP_INSTALL: "YES"
