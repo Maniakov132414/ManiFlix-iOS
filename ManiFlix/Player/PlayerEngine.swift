@@ -75,6 +75,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     @Published var flipVertical: Bool = false
     @Published var availableSubtitles: [SubtitleTrackOption] = []
     @Published var selectedSubtitleId: String = "off"
+    @Published var hasEngSub: Bool = false
     private var subtitleOptionsMap: [String: AVMediaSelectionOption] = [:]
     var closingExplicitly: Bool = false
 
@@ -203,6 +204,10 @@ final class PlayerEngine: NSObject, ObservableObject {
         userSeekedInsideAdIds.removeAll()
         lastPlayPosSec = 0
         didFailoverThisEpisode = false
+        availableSubtitles = []
+        subtitleOptionsMap = [:]
+        selectedSubtitleId = "off"
+        hasEngSub = false
 
         guard let ep = currentEpisode else {
             isFailed = true
@@ -326,6 +331,9 @@ final class PlayerEngine: NSObject, ObservableObject {
                         let viEn = opts.filter { $0.name == "Tiếng Việt" || $0.name == "English" }
                         self.availableSubtitles = viEn.isEmpty ? opts : viEn
                         self.subtitleOptionsMap = map
+                        let allViOnly = !opts.isEmpty && opts.allSatisfy { $0.name == "Tiếng Việt" }
+                        self.hasEngSub = opts.contains(where: { $0.name == "English" }) ||
+                            (!allViOnly && !opts.isEmpty && (self.movie.sub_langs ?? []).contains(where: { $0.lowercased().hasPrefix("en") }))
 
                         let pref = AppPreferences.shared.defaultSubtitleLang.lowercased()
                         if pref == "off" {
@@ -346,6 +354,7 @@ final class PlayerEngine: NSObject, ObservableObject {
                         self.availableSubtitles = []
                         self.subtitleOptionsMap = [:]
                         self.selectedSubtitleId = "off"
+                        self.hasEngSub = false
                     }
                     if self.pendingResumeSeconds > 3 {
                         let limit = dur.isFinite ? max(0, dur - 10) : self.pendingResumeSeconds
@@ -484,7 +493,7 @@ final class PlayerEngine: NSObject, ObservableObject {
                     if atEntry || crossedStart {
                         skippedCutIds.insert(marker.id)
                         lastPlayPosSec = endSec + 0.1
-                        seek(to: endSec + 0.1)
+                        seek(to: endSec + 0.1, programmatic: true)
                         showToast("Đã bỏ qua quảng cáo")
                         return
                     }
@@ -493,18 +502,18 @@ final class PlayerEngine: NSObject, ObservableObject {
         }
         lastPlayPosSec = sec
 
-        // 2. Intro / Recap (strictly type != "outro", matching watch.html)
+        // 2. Intro / Recap (strictly type != "outro", visible throughout entire [start, end) window)
         var foundIntro: AdMarker? = nil
         if prefs.introSkipBehavior != .off {
             for marker in validMarkers {
                 let mode = marker.mode ?? (marker.type == "ad" ? "cut" : (marker.type == "credit" ? "mark" : "skip"))
                 guard mode == "skip" && marker.type != "outro" else { continue }
                 let endSec = effectiveEnd(for: marker)
-                if sec >= marker.start && sec < endSec - 0.5 {
+                if sec >= marker.start && sec < endSec {
                     if prefs.introSkipBehavior == .auto && !skippedCutIds.contains(marker.id) {
                         skippedCutIds.insert(marker.id)
                         recordUndoAnchor(previousTime: sec)
-                        seek(to: endSec + 0.1)
+                        seek(to: endSec + 0.1, programmatic: true)
                         return
                     } else if !dismissedSkipIds.contains(marker.id) && !skippedCutIds.contains(marker.id) {
                         foundIntro = marker
@@ -516,16 +525,9 @@ final class PlayerEngine: NSObject, ObservableObject {
             }
         }
 
-        if let intro = foundIntro {
-            if !shownPromptIds.contains(intro.id) {
-                shownPromptIds.insert(intro.id)
-                activeSkipPrompt = intro
-                scheduleIntroPromptAutoHide(for: intro.id)
-            }
-        } else {
-            if activeSkipPrompt != nil {
-                activeSkipPrompt = nil
-            }
+        promptAutoHideTask?.cancel()
+        if activeSkipPrompt?.id != foundIntro?.id {
+            activeSkipPrompt = foundIntro
         }
 
         // 3. Outro / Credits window
@@ -707,11 +709,22 @@ final class PlayerEngine: NSObject, ObservableObject {
         Haptics.impact(.light)
     }
 
-    func seek(to seconds: Double) {
+    func seek(to seconds: Double, programmatic: Bool = false) {
         let clamped = max(0, min(seconds, duration > 0 ? duration : seconds))
         let cm = CMTime(seconds: clamped, preferredTimescale: 600)
         player.seek(to: cm, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = clamped
+        if !programmatic {
+            for marker in filteredTimelineMarkers {
+                let mode = marker.mode ?? (marker.type == "ad" ? "cut" : (marker.type == "credit" ? "mark" : "skip"))
+                let endSec = effectiveEnd(for: marker)
+                if mode == "skip" && clamped >= marker.start && clamped < endSec {
+                    skippedCutIds.remove(marker.id)
+                    dismissedSkipIds.remove(marker.id)
+                }
+            }
+            evaluateAdAndIntroMarkers(at: clamped)
+        }
         updateNowPlayingInfo()
     }
 
@@ -734,7 +747,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         skippedCutIds.insert(marker.id)
         activeSkipPrompt = nil
         recordUndoAnchor(previousTime: currentTime)
-        seek(to: endSec + 0.1)
+        seek(to: endSec + 0.1, programmatic: true)
         Haptics.impact(.medium)
     }
 

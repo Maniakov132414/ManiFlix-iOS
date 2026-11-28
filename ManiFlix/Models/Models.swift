@@ -143,6 +143,7 @@ struct MovieDetail: Codable, Hashable {
     let episode_total: FlexibleString?
     let quality: String?
     let lang: String?
+    var sub_langs: [String]? = nil
     let year: FlexibleInt?
     let actor: [String]?
     let director: [String]?

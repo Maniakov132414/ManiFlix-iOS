@@ -756,10 +756,8 @@ struct ManiFlixPlayerView: View {
 
                     Spacer()
 
-                    Menu {
-                        if engine.availableSubtitles.isEmpty {
-                            Text("Không có phụ đề rời")
-                        } else {
+                    if engine.hasEngSub {
+                        Menu {
                             ForEach(engine.availableSubtitles) { sub in
                                 Button {
                                     engine.selectSubtitle(id: sub.id)
@@ -785,18 +783,18 @@ struct ManiFlixPlayerView: View {
                                     }
                                 }
                             }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: engine.selectedSubtitleId == "off" ? "captions.bubble" : "captions.bubble.fill")
+                                Text(engine.currentSubtitleShortLabel)
+                            }
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .frame(height: 32)
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: engine.selectedSubtitleId == "off" ? "captions.bubble" : "captions.bubble.fill")
-                            Text(engine.currentSubtitleShortLabel)
-                        }
-                        .font(.caption.weight(.medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .frame(height: 32)
+                        .adaptiveGlassCapsule()
                     }
-                    .adaptiveGlassCapsule()
 
                     Button {
                         engine.cycleAspectMode()
