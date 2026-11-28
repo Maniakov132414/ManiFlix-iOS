@@ -11,6 +11,7 @@ struct MovieDetailView: View {
     @State private var containerWidth: CGFloat = UIScreen.main.bounds.width
     @State private var detail: MovieDetail?
     @State private var servers: [EpisodeServer] = []
+    @State private var franchiseMeta: FranchiseResponse?
     @State private var franchiseSeasons: [FranchiseSeason] = []
     @State private var relatedMovies: [MovieItem] = []
     @State private var selectedServerIdx = 0
@@ -134,12 +135,11 @@ struct MovieDetailView: View {
     }
 
     private var headerTitleText: String {
-        detail?.name ?? seedMovie?.name ?? ""
+        detail?.localizedPrimaryTitle(prefs.uiLanguage) ?? seedMovie?.localizedPrimaryTitle(prefs.uiLanguage) ?? ""
     }
 
     private var headerOriginText: String? {
-        guard let orig = detail?.origin_name ?? seedMovie?.origin_name, !orig.isEmpty else { return nil }
-        return orig
+        detail?.localizedSecondaryTitle(prefs.uiLanguage) ?? seedMovie?.localizedSecondaryTitle(prefs.uiLanguage)
     }
 
     private var headerMetaText: String? {
@@ -293,7 +293,9 @@ struct MovieDetailView: View {
     }
 
     private var franchiseSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let headerTitle = franchiseMeta?.localizedHeader(uiLang: prefs.uiLanguage, count: franchiseSeasons.count)
+            ?? (prefs.uiLanguage == "en" ? "Franchise (\(franchiseSeasons.count) parts)" : "Các phần phim (\(franchiseSeasons.count))")
+        return VStack(alignment: .leading, spacing: 10) {
             Button {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     isFranchiseExpanded.toggle()
@@ -301,13 +303,13 @@ struct MovieDetailView: View {
                 Haptics.impact(.light)
             } label: {
                 HStack(spacing: 8) {
-                    Text("Các phần phim (\(franchiseSeasons.count))")
+                    Text(headerTitle)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
 
                     Spacer()
 
-                    Text(isFranchiseExpanded ? "Thu gọn" : "Mở rộng")
+                    Text(isFranchiseExpanded ? prefs.tr("Thu gọn", "Collapse") : prefs.tr("Mở rộng", "Expand"))
                         .font(.caption.weight(.medium))
                         .foregroundColor(ManiFlixTheme.secondaryText(colorScheme))
 
@@ -343,7 +345,7 @@ struct MovieDetailView: View {
     private func franchiseSeasonChip(_ season: FranchiseSeason) -> some View {
         let isCurrent = season.slug == slug
         return NavigationLink(destination: MovieDetailView(slug: season.slug, seedMovie: nil)) {
-            Text(season.displayFullTitle)
+            Text(season.localizedLabel(uiLang: prefs.uiLanguage, meta: franchiseMeta, allSeasons: franchiseSeasons))
                 .font(.caption.weight(isCurrent ? .semibold : .medium))
                 .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                 .multilineTextAlignment(.leading)
@@ -505,7 +507,8 @@ struct MovieDetailView: View {
             self.detail = res.movie
             self.servers = res.episodes ?? []
             if let fr = try? await ManiFlixAPI.shared.fetchFranchise(slug: slug) {
-                self.franchiseSeasons = fr.seasons ?? []
+                self.franchiseMeta = fr
+                self.franchiseSeasons = TitleLocalizer.sortFranchiseSeasons(fr.seasons ?? [], baseTitle: fr.baseTitle)
             }
             await loadRelatedMovies(for: res.movie)
         } catch {

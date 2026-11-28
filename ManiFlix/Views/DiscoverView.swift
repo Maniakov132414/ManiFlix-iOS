@@ -78,7 +78,7 @@ struct MoviePosterCard: View {
             }
 
             HStack(alignment: .center, spacing: 4) {
-                Text(movie.name)
+                Text(movie.localizedPrimaryTitle(prefs.uiLanguage))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(ManiFlixTheme.primaryText(colorScheme))
                     .lineLimit(1)
@@ -386,13 +386,13 @@ struct DiscoverView: View {
                         .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.6))
                 }
 
-                Text(movie.name)
+                Text(movie.localizedPrimaryTitle(prefs.uiLanguage))
                     .font(.title3.weight(.bold))
                     .foregroundColor(.white)
                     .lineLimit(2)
 
-                if let orig = movie.origin_name, !orig.isEmpty {
-                    Text(orig)
+                if let sec = movie.localizedSecondaryTitle(prefs.uiLanguage), !sec.isEmpty {
+                    Text(sec)
                         .font(.caption)
                         .foregroundColor(Color(white: 0.72))
                         .lineLimit(1)

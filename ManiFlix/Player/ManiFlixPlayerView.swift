@@ -559,7 +559,7 @@ struct ManiFlixPlayerView: View {
                 .adaptiveGlassCapsule()
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(engine.movie.name)
+                    Text(engine.movie.localizedPrimaryTitle(prefs.uiLanguage))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
