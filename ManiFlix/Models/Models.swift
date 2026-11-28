@@ -254,7 +254,7 @@ struct FranchiseResponse: Codable {
         let rawBase = isEn
             ? ((baseTitleEn ?? "").isEmpty ? (baseTitle ?? "") : (baseTitleEn ?? ""))
             : ((baseTitleVi ?? "").isEmpty ? (baseTitle ?? "") : (baseTitleVi ?? ""))
-        let cleanBase = rawBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanBase = TitleLocalizer.cleanFranchiseTitle(rawBase)
         if cleanBase.isEmpty {
             return isEn ? "Franchise (\(count) parts)" : "Các phần phim (\(count))"
         }
@@ -272,6 +272,7 @@ struct FranchiseSeason: Codable, Identifiable, Hashable {
     let en_name: String?
     let romaji_name: String?
     let isRecap: Bool?
+    let isLiveAction: Bool?
     let fullTitle: String?
     let originName: String?
     let slug: String
@@ -299,7 +300,8 @@ struct FranchiseSeason: Codable, Identifiable, Hashable {
             label: fallbackRaw,
             uiLang: uiLang,
             prefixes: [meta?.baseTitleVi, meta?.baseTitleEn, meta?.baseTitleRomaji, meta?.baseTitle].compactMap { $0 },
-            hasSeason2: hasSeason2
+            hasSeason2: hasSeason2,
+            isLiveAction: isLiveAction == true
         )
     }
 }
@@ -425,40 +427,86 @@ enum TitleLocalizer {
         return (primary, picked.joined(separator: " • "))
     }
 
-    static func stripFranchisePrefix(label: String, uiLang: String, prefixes: [String], hasSeason2: Bool) -> String {
-        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return hasSeason2 ? (uiLang == "en" ? "Season 1" : "Phần 1") : "TV Series"
-        }
-        let sortedPrefixes = prefixes
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.count >= 3 }
-            .sorted { $0.count > $1.count }
+    static func cleanFranchiseTitle(_ raw: String) -> String {
+        return raw
+            .replacingOccurrences(of: "^[\\s:\\-–—•|·/.,]+|[\\s:\\-–—•|·/]+$", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
-        for prefix in sortedPrefixes {
-            if trimmed.lowercased().hasPrefix(prefix.lowercased()) {
-                let idx = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
-                var rest = String(trimmed[idx...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                while let first = rest.first, [":", "-", "–", "—", "·", "|", "/"].contains(String(first)) {
-                    rest.removeFirst()
-                    rest = rest.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func buildOrthoPattern(_ prefix: String) -> String {
+        let clean = cleanFranchiseTitle(prefix)
+        guard clean.count >= 3 else { return "" }
+        return NSRegularExpression.escapedPattern(for: clean)
+            .replacingOccurrences(of: "['’‘`]", with: "['’‘`]?", options: .regularExpression)
+            .replacingOccurrences(of: "[ìỳÌỲ]", with: "[ìỳÌỲ]", options: .regularExpression)
+            .replacingOccurrences(of: "[íýÍÝ]", with: "[íýÍÝ]", options: .regularExpression)
+            .replacingOccurrences(of: "[ỉỷỈỶ]", with: "[ỉỷỈỶ]", options: .regularExpression)
+            .replacingOccurrences(of: "[ĩỹĨỸ]", with: "[ĩỹĨỸ]", options: .regularExpression)
+            .replacingOccurrences(of: "[ịỵỊỴ]", with: "[ịỵỊỴ]", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: "[\\s:\\-–—•|·]+", options: .regularExpression)
+    }
+
+    static func stripFranchisePrefix(label: String, uiLang: String, prefixes: [String], hasSeason2: Bool, isLiveAction: Bool = false) -> String {
+        var cur = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawPicked = cur
+        if !cur.isEmpty {
+            let sortedPats = prefixes
+                .map { cleanFranchiseTitle($0) }
+                .filter { $0.count >= 3 }
+                .sorted { $0.count > $1.count }
+                .map { buildOrthoPattern($0) }
+                .filter { !$0.isEmpty }
+
+            for pat in sortedPats {
+                if cur.range(of: "^\(pat)[\\s:!\\-–—.]*$", options: [.regularExpression, .caseInsensitive]) != nil {
+                    cur = ""
+                    break
                 }
-                if rest.isEmpty {
-                    return hasSeason2 ? (uiLang == "en" ? "Season 1" : "Phần 1") : "TV Series"
+                let leadPattern = "^\(pat)(?:\\s*[:\\-–—!|•/]+\\s*|\\s+(?=(?:Movie|Phần|Phan|Season|SS|Mùa|OVA|ONA|Special|SP|Mini|Idol|Shinonome|Chapter|Part|Arc|Episode|Tập|\\d+|II|III|IV|V|VI)\\b))"
+                if let r = cur.range(of: leadPattern, options: [.regularExpression, .caseInsensitive]) {
+                    cur.removeSubrange(r)
+                    cur = cur.trimmingCharacters(in: .whitespacesAndNewlines)
+                    break
                 }
-                if uiLang == "en" {
-                    rest = rest.replacingOccurrences(of: "^Phần\\s+(\\d+)", with: "Season $1", options: [.regularExpression, .caseInsensitive])
+                let trailPattern = "(?:\\s*[:\\-–—|•]+\\s*)\(pat)(\\s*\\((?:Live-Action|Movie|OVA|ONA|Special|TV)\\))?[\\s.!]*$"
+                if cur.range(of: trailPattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                    let cand = cur.replacingOccurrences(of: trailPattern, with: "$1", options: [.regularExpression, .caseInsensitive]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if cand.count >= 2 {
+                        cur = cand
+                        break
+                    }
                 }
-                return rest
             }
         }
-        return trimmed
+        cur = cur.replacingOccurrences(of: "^[:\\-–—•|\\s]+|[:\\-–—•|\\s]+$", with: "", options: .regularExpression)
+        if cur.isEmpty || cur.range(of: "^tv\\s*series$", options: [.regularExpression, .caseInsensitive]) != nil {
+            if rawPicked.range(of: "^tv\\s*series$", options: [.regularExpression, .caseInsensitive]) != nil {
+                cur = "TV Series"
+            } else {
+                cur = hasSeason2 ? (uiLang == "en" ? "Season 1" : "Phần 1") : "TV Series"
+            }
+        } else if uiLang == "en" {
+            cur = cur.replacingOccurrences(of: "^Phần\\s+(\\d+)\\b", with: "Season $1", options: [.regularExpression, .caseInsensitive])
+        }
+        if isLiveAction {
+            cur = cur.replacingOccurrences(of: "\\s*\\((?:Movie|Phim\\s*Lẻ)\\)\\s*", with: " ", options: [.regularExpression, .caseInsensitive])
+                .replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if cur.range(of: "\\(\\s*live[\\s\\-]*action\\s*\\)", options: [.regularExpression, .caseInsensitive]) == nil {
+                cur = "\(cur) (Live-Action)"
+            }
+        }
+        return cur
     }
 
     static func sortFranchiseSeasons(_ seasons: [FranchiseSeason], baseTitle: String?) -> [FranchiseSeason] {
         guard seasons.count > 1 else { return seasons }
         if seasons.contains(where: { $0.sortIndex != nil }) {
             return seasons.enumerated().sorted { lhs, rhs in
+                let la = lhs.element.isLiveAction == true
+                let lb = rhs.element.isLiveAction == true
+                if la != lb { return !la }
                 let li = lhs.element.sortIndex?.value ?? (1000 + lhs.offset)
                 let ri = rhs.element.sortIndex?.value ?? (1000 + rhs.offset)
                 return li != ri ? li < ri : lhs.offset < rhs.offset
@@ -468,6 +516,9 @@ enum TitleLocalizer {
         return seasons.enumerated().sorted { lhs, rhs in
             let a = lhs.element
             let b = rhs.element
+            let la = a.isLiveAction == true
+            let lb = b.isLiveAction == true
+            if la != lb { return !la }
             let aRoot = !baseNorm.isEmpty && (normKey(a.fullTitle ?? "") == baseNorm || (a.name ?? "") == "TV Series")
             let bRoot = !baseNorm.isEmpty && (normKey(b.fullTitle ?? "") == baseNorm || (b.name ?? "") == "TV Series")
             let ay = a.year?.value ?? 9999
